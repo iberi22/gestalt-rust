@@ -255,7 +255,7 @@ async fn main() {
         // REPL Mode
         println!("🤖 Gestalt REPL (v0.1.0)");
         println!("Type '/exit' to quit, '/clear' to clear history.");
-        
+
         let mut rl = DefaultEditor::new().unwrap();
         if rl.load_history("history.txt").is_err() {
             println!("No previous history.");
@@ -267,7 +267,7 @@ async fn main() {
                 Ok(line) => {
                     let line = line.trim();
                     if line.is_empty() { continue; }
-                    
+
                     rl.add_history_entry(line).unwrap();
 
                     if line == "/exit" {
@@ -304,9 +304,9 @@ async fn main() {
 }
 
 async fn process_prompt(
-    prompt: &str, 
-    providers: &Vec<(String, Arc<dyn LlmProvider>)>, 
-    cli: &Cli, 
+    prompt: &str,
+    providers: &Vec<(String, Arc<dyn LlmProvider>)>,
+    cli: &Cli,
     consensus: bool
 ) {
     // --- Context Engine ---
@@ -357,7 +357,7 @@ async fn process_prompt(
                 temperature: 0.7,
                 max_tokens: None,
             };
-            
+
             // Try streaming first
             match provider.stream(request.clone()).await {
                 Ok(mut stream) => {

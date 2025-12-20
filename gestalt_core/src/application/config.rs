@@ -62,14 +62,14 @@ impl AppConfig {
 
         // 1. Start with defaults
         let defaults = AppConfig::default();
-        
+
         // We need to manually set defaults because Config::builder() doesn't take a struct directly easily
         // without serializing it first, or we can just set individual keys.
         // For simplicity, we'll rely on the config crate's merging.
-        // Actually, a better pattern is to build the config and then try to deserialize, 
-        // but if keys are missing, it might fail. 
+        // Actually, a better pattern is to build the config and then try to deserialize,
+        // but if keys are missing, it might fail.
         // Let's set default values explicitly in the builder.
-        
+
         builder = builder
             .set_default("gemini.model", defaults.gemini.model)?
             .set_default("openai.model", defaults.openai.model)?
@@ -81,7 +81,7 @@ impl AppConfig {
         if let Some(proj_dirs) = ProjectDirs::from("com", "gestalt", "gestalt") {
             let config_dir = proj_dirs.config_dir();
             let config_path = config_dir.join("gestalt.toml");
-            
+
             if config_path.exists() {
                 builder = builder.add_source(File::from(config_path));
             }

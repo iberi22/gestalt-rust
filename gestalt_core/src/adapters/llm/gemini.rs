@@ -96,7 +96,7 @@ impl LlmProvider for GeminiProvider {
         });
 
         let client = self.client.clone();
-        
+
         let stream = async_stream::stream! {
             let resp = client.post(&url)
                 .json(&body)
@@ -118,7 +118,7 @@ impl LlmProvider for GeminiProvider {
                              // This is brittle but works for simple cases.
                              let clean_s = s.trim().trim_start_matches('[').trim_end_matches(']').trim_start_matches(',').trim();
                              if clean_s.is_empty() { continue; }
-                             
+
                              if let Ok(json) = serde_json::from_str::<serde_json::Value>(clean_s) {
                                  if let Some(text) = json["candidates"][0]["content"]["parts"][0]["text"].as_str() {
                                      yield Ok(text.to_string());
@@ -130,7 +130,7 @@ impl LlmProvider for GeminiProvider {
                 Err(e) => yield Err(LlmError::Network(e.to_string())),
             }
         };
-        
+
         Ok(Box::pin(stream))
     }
 }
