@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
 use std::sync::Arc;
+use std::path::Path;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -12,7 +13,9 @@ use gestalt_core::adapters::llm::openai::OpenAIProvider;
 use gestalt_core::adapters::llm::qwen::QwenProvider;
 use gestalt_core::application::consensus::ConsensusService;
 use gestalt_core::application::mcp_service::McpService;
-use gestalt_core::ports::outbound::llm_provider::LlmProvider;
+use gestalt_core::application::config::AppConfig;
+use gestalt_core::ports::outbound::llm_provider::{LlmProvider, LlmRequest};
+use gestalt_core::context::{detector, scanner};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -23,6 +26,14 @@ struct Cli {
     /// The prompt to send to the agents (when not using subcommands)
     #[arg(short, long)]
     prompt: Option<String>,
+
+    /// Enable Multi-Model Consensus (default: false)
+    #[arg(long, default_value_t = false)]
+    consensus: bool,
+
+    /// Enable Context Engine (default: true)
+    #[arg(long, default_value_t = true)]
+    context: bool,
 
     /// Google Gemini Model (default: gemini-2.0-flash)
     #[arg(long, default_value = "gemini-2.0-flash")]
@@ -47,6 +58,12 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Manage configuration
+    #[command(name = "config")]
+    Config {
+        #[command(subcommand)]
+        subcommand: ConfigCommands,
+    },
     /// Login with Qwen OAuth2 (Device Code flow)
     #[command(name = "qwen-login")]
     QwenLogin,
@@ -55,6 +72,14 @@ enum Commands {
     QwenLogout,
     /// Show authentication status
     Status,
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigCommands {
+    /// Initialize a default configuration file
+    Init,
+    /// Show current configuration
+    Show,
 }
 
 #[tokio::main]
@@ -74,6 +99,33 @@ async fn main() {
 
     // Handle subcommands
     match cli.command {
+        Some(Commands::Config { subcommand }) => {
+            match subcommand {
+                ConfigCommands::Init => {
+                    let default_config = AppConfig::default();
+                    if let Some(path) = AppConfig::get_config_path() {
+                        if path.exists() {
+                            eprintln!("❌ Config file already exists at {:?}", path);
+                            return;
+                        }
+                        if let Some(parent) = path.parent() {
+                            std::fs::create_dir_all(parent).expect("Failed to create config directory");
+                        }
+                        
+                        let toml_str = toml::to_string_pretty(&default_config).expect("Failed to serialize config");
+                        std::fs::write(&path, toml_str).expect("Failed to write config file");
+                        println!("✅ Config file created at {:?}", path);
+                    }
+                }
+                ConfigCommands::Show => {
+                    match AppConfig::load() {
+                        Ok(config) => println!("{:#?}", config),
+                        Err(e) => eprintln!("❌ Failed to load config: {}", e),
+                    }
+                }
+            }
+            return;
+        }
         Some(Commands::QwenLogin) => {
             match qwen_oauth::run_device_flow_login().await {
                 Ok(_) => {
@@ -156,43 +208,50 @@ async fn main() {
         }
     }
 
+    // Load Config
+    let config = AppConfig::load().unwrap_or_else(|e| {
+        tracing::warn!("Failed to load config: {}. Using defaults.", e);
+        AppConfig::default()
+    });
+
     // 5. Initialize Providers
     let mut providers: Vec<(String, Arc<dyn LlmProvider>)> = Vec::new();
 
-    // Gemini: Use gemini-cli credentials if available
+    // Gemini
+    let gemini_model = if cli.gemini_model != "gemini-2.0-flash" { cli.gemini_model.clone() } else { config.gemini.model.clone() };
+    
     if google_oauth::has_gemini_cli_credentials().await {
         info!("Using Gemini with gemini-cli OAuth credentials.");
-        let gemini = GeminiOAuthProvider::new(cli.gemini_model.clone());
+        let gemini = GeminiOAuthProvider::new(gemini_model);
         providers.push(("Gemini".to_string(), Arc::new(gemini)));
-    } else if std::env::var("GOOGLE_API_KEY").is_ok() || std::env::var("GEMINI_API_KEY").is_ok() {
-        if let Ok(key) = std::env::var("GEMINI_API_KEY") {
-            std::env::set_var("GOOGLE_API_KEY", key);
-        }
-        let gemini = GeminiProvider::new(cli.gemini_model.clone());
+    } else if let Some(key) = config.gemini.api_key.clone().or_else(|| std::env::var("GOOGLE_API_KEY").ok()) {
+        std::env::set_var("GOOGLE_API_KEY", key);
+        let gemini = GeminiProvider::new(gemini_model);
         providers.push(("Gemini (API Key)".to_string(), Arc::new(gemini)));
     } else {
-        info!("No Gemini credentials. Run `gemini` CLI to login.");
+        info!("No Gemini credentials found.");
     }
 
-    // Qwen: Use Qwen credentials if available
+    // Qwen
+    let qwen_model = if cli.qwen_model != "qwen-coder" { cli.qwen_model.clone() } else { config.qwen.model.clone() };
     if qwen_oauth::has_qwen_credentials().await {
         info!("Using Qwen with OAuth credentials.");
-        let qwen = QwenProvider::new(cli.qwen_model.clone());
+        let qwen = QwenProvider::new(qwen_model);
         providers.push(("Qwen".to_string(), Arc::new(qwen)));
-    } else {
-        info!("No Qwen credentials. Run `gestalt_cli qwen-login` to login.");
     }
 
     // OpenAI
-    if std::env::var("OPENAI_API_KEY").is_ok() {
-        let openai = OpenAIProvider::new(cli.openai_model.clone());
+    let openai_model = if cli.openai_model != "gpt-4" { cli.openai_model.clone() } else { config.openai.model.clone() };
+    if let Some(key) = config.openai.api_key.clone().or_else(|| std::env::var("OPENAI_API_KEY").ok()) {
+        std::env::set_var("OPENAI_API_KEY", key);
+        let openai = OpenAIProvider::new(openai_model);
         providers.push(("OpenAI".to_string(), Arc::new(openai)));
-    } else {
-        info!("OPENAI_API_KEY not found. Skipping OpenAI.");
     }
 
-    // Ollama (Always assumed available or fails gracefully in network call)
-    let ollama = OllamaProvider::new(cli.ollama_url.clone(), cli.ollama_model.clone());
+    // Ollama
+    let ollama_model = if cli.ollama_model != "llama2" { cli.ollama_model.clone() } else { config.ollama.model.clone() };
+    let ollama_url = if cli.ollama_url != "http://localhost:11434" { cli.ollama_url.clone() } else { config.ollama.base_url.clone() };
+    let ollama = OllamaProvider::new(ollama_url, ollama_model);
     providers.push(("Ollama".to_string(), Arc::new(ollama)));
 
     if providers.is_empty() {
@@ -200,13 +259,59 @@ async fn main() {
         return;
     }
 
-    // 5. Run Consensus
-    let service = ConsensusService::new(providers);
-    let result = service.ask_all(&prompt).await;
+    // --- Context Engine ---
+    let mut final_prompt = prompt.clone();
+    if cli.context {
+        info!("🧠 Context Engine: Analyzing project...");
+        let root = Path::new(".");
+        let project_type = detector::detect_project_type(root);
+        let tree = scanner::generate_directory_tree(root, 2);
+        let files = scanner::scan_markdown_files(root);
 
-    // 6. Print Output as JSON for parsing
-    match serde_json::to_string_pretty(&result) {
-        Ok(json) => println!("{}", json),
-        Err(e) => eprintln!("Failed to serialize result: {}", e),
+        let mut context_str = String::new();
+        context_str.push_str(&format!("Project Type: {}\n", project_type));
+        context_str.push_str("Directory Structure:\n");
+        context_str.push_str(&tree);
+        context_str.push_str("\nMarkdown Context (first 100 lines):\n");
+
+        for file in files {
+            context_str.push_str(&format!("--- File: {} ---\n{}\n\n", file.path, file.content));
+        }
+
+        // Truncate if too long (approx 16k chars ~ 4k tokens)
+        if context_str.len() > 16000 {
+             context_str.truncate(16000);
+             context_str.push_str("\n... (truncated context)");
+        }
+
+        final_prompt = format!("CONTEXT:\n{}\n\nUSER PROMPT:\n{}", context_str, prompt);
+        info!("🧠 Context Engine: Added {} chars of context.", context_str.len());
+    }
+
+    if cli.consensus {
+        info!("Starting Gestalt Agent Consensus...");
+        let service = ConsensusService::new(providers);
+        let result = service.ask_all(&final_prompt).await;
+
+        match serde_json::to_string_pretty(&result) {
+            Ok(json) => println!("{}", json),
+            Err(e) => eprintln!("Failed to serialize result: {}", e),
+        }
+    } else {
+        info!("Running in Single-Model Mode (Consensus Disabled)");
+        // Pick the first available provider (Gemini > Qwen > OpenAI > Ollama)
+        if let Some((name, provider)) = providers.first() {
+            info!("Using primary provider: {}", name);
+            let request = LlmRequest {
+                prompt: final_prompt,
+                model: String::new(),
+                temperature: 0.7,
+                max_tokens: None,
+            };
+            match provider.generate(request).await {
+                Ok(response) => println!("{}", response.content),
+                Err(e) => eprintln!("Error from {}: {}", name, e),
+            }
+        }
     }
 }

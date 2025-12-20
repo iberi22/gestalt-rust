@@ -1,0 +1,18 @@
+use std::path::Path;
+use super::ProjectType;
+
+pub fn detect_project_type(path: &Path) -> ProjectType {
+    if path.join("Cargo.toml").exists() {
+        return ProjectType::Rust;
+    }
+    if path.join("pubspec.yaml").exists() {
+        return ProjectType::Flutter;
+    }
+    if path.join("package.json").exists() {
+        return ProjectType::Node;
+    }
+    if path.join("requirements.txt").exists() || path.join("pyproject.toml").exists() {
+        return ProjectType::Python;
+    }
+    ProjectType::Unknown
+}
