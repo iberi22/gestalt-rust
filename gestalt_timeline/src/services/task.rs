@@ -1,0 +1,150 @@
+//! Task Service
+
+use anyhow::{Context, Result};
+use chrono::Utc;
+use std::time::Instant;
+use tracing::{debug, info};
+
+use crate::db::SurrealClient;
+use crate::models::{EventType, Task, TaskResult, TaskStatus};
+use crate::services::TimelineService;
+
+/// Service for managing tasks.
+#[derive(Clone)]
+pub struct TaskService {
+    db: SurrealClient,
+    timeline: TimelineService,
+}
+
+impl TaskService {
+    /// Create a new TaskService.
+    pub fn new(db: SurrealClient, timeline: TimelineService) -> Self {
+        Self { db, timeline }
+    }
+
+    /// Create a new task.
+    pub async fn create_task(
+        &self,
+        project_name: &str,
+        description: &str,
+        agent_id: &str,
+    ) -> Result<Task> {
+        debug!("Creating task for project: {}", project_name);
+
+        // Find project by name
+        let query = "SELECT * FROM projects WHERE name = $name LIMIT 1";
+        let projects: Vec<crate::models::Project> =
+            self.db.query_with(query, ("name", project_name)).await?;
+
+        let project = projects
+            .into_iter()
+            .next()
+            .context("Project not found")?;
+
+        let task = Task::new(&project.id, description, agent_id);
+
+        // Store in database
+        let created: Task = self.db.create("tasks", &task).await?;
+
+        // Record timeline event
+        self.timeline
+            .emit_task_event(agent_id, EventType::TaskCreated, &project.id, &created.id)
+            .await?;
+
+        Ok(created)
+    }
+
+    /// List tasks, optionally filtered by project.
+    pub async fn list_tasks(&self, project_name: Option<&str>) -> Result<Vec<Task>> {
+        match project_name {
+            Some(name) => {
+                // Find project first
+                let query = "SELECT * FROM projects WHERE name = $name LIMIT 1";
+                let projects: Vec<crate::models::Project> =
+                    self.db.query_with(query, ("name", name)).await?;
+
+                if let Some(project) = projects.into_iter().next() {
+                    let query = "SELECT * FROM tasks WHERE project_id = $project_id ORDER BY created_at DESC";
+                    self.db.query_with(query, ("project_id", &project.id)).await
+                } else {
+                    Ok(vec![])
+                }
+            }
+            None => self.db.select_all("tasks").await,
+        }
+    }
+
+    /// Get a task by ID.
+    pub async fn get_by_id(&self, id: &str) -> Result<Option<Task>> {
+        self.db.select_by_id("tasks", id).await
+    }
+
+    /// Run a task asynchronously.
+    ///
+    /// This simulates task execution. In a real implementation, this would
+    /// dispatch work to actual executors.
+    pub async fn run_task(&self, task_id: &str, agent_id: &str) -> Result<TaskResult> {
+        info!("Running task: {}", task_id);
+
+        let mut task = self
+            .get_by_id(task_id)
+            .await?
+            .context("Task not found")?;
+
+        // Update status to running
+        task.status = TaskStatus::Running;
+        task.updated_at = Utc::now();
+        task.executed_by = Some(agent_id.to_string());
+        self.db.update("tasks", task_id, &task).await?;
+
+        // Record start event
+        self.timeline
+            .emit_task_event(agent_id, EventType::TaskStarted, &task.project_id, task_id)
+            .await?;
+
+        // Simulate async work
+        let start = Instant::now();
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        // Mark as completed
+        task.status = TaskStatus::Completed;
+        task.completed_at = Some(Utc::now());
+        task.updated_at = Utc::now();
+        self.db.update("tasks", task_id, &task).await?;
+
+        // Record completion event
+        self.timeline
+            .emit_task_event(agent_id, EventType::TaskCompleted, &task.project_id, task_id)
+            .await?;
+
+        let result = TaskResult {
+            task_id: task_id.to_string(),
+            status: TaskStatus::Completed,
+            message: format!("Task '{}' completed successfully", task.description),
+            duration_ms,
+            completed_at: Utc::now(),
+        };
+
+        Ok(result)
+    }
+
+    /// Cancel a task.
+    pub async fn cancel_task(&self, task_id: &str, agent_id: &str) -> Result<Task> {
+        let mut task = self
+            .get_by_id(task_id)
+            .await?
+            .context("Task not found")?;
+
+        task.status = TaskStatus::Cancelled;
+        task.updated_at = Utc::now();
+
+        let updated = self.db.update("tasks", task_id, &task).await?;
+
+        self.timeline
+            .emit_task_event(agent_id, EventType::TaskFailed, &task.project_id, task_id)
+            .await?;
+
+        Ok(updated)
+    }
+}

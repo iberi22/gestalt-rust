@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "gestalt_core",
+    "gestalt_cli",
+    "gestalt_timeline",
+]
+resolver = "2"
