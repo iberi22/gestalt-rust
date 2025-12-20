@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures::stream::BoxStream;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -40,5 +41,5 @@ pub trait LlmProvider: Send + Sync {
 
     /// Stream the response from the LLM
     /// Returns a stream of strings chunks
-    async fn stream(&self, request: LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<String, LlmError>>, LlmError>;
+    async fn stream(&self, request: LlmRequest) -> Result<BoxStream<'static, Result<String, LlmError>>, LlmError>;
 }

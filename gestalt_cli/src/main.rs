@@ -2,8 +2,12 @@ use clap::{Parser, Subcommand};
 use dotenv::dotenv;
 use std::sync::Arc;
 use std::path::Path;
+use std::io::Write;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
+use futures::StreamExt;
 
 use gestalt_core::adapters::auth::{google_oauth, qwen_oauth};
 use gestalt_core::adapters::llm::gemini::GeminiProvider;
@@ -111,7 +115,7 @@ async fn main() {
                         if let Some(parent) = path.parent() {
                             std::fs::create_dir_all(parent).expect("Failed to create config directory");
                         }
-                        
+
                         let toml_str = toml::to_string_pretty(&default_config).expect("Failed to serialize config");
                         std::fs::write(&path, toml_str).expect("Failed to write config file");
                         println!("✅ Config file created at {:?}", path);
@@ -176,22 +180,6 @@ async fn main() {
         }
     }
 
-    // Require prompt for ask flow
-    let prompt = match cli.prompt {
-        Some(p) => p,
-        None => {
-            eprintln!("Error: --prompt is required. Use --help for usage.");
-            eprintln!("\nExamples:");
-            eprintln!("  gestalt_cli --prompt \"Explain Rust\"");
-            eprintln!("  gestalt_cli status");
-            eprintln!("  gestalt_cli qwen-login");
-            return;
-        }
-    };
-
-    info!("Starting Gestalt Agent Consensus...");
-    info!("Prompt: {}", prompt);
-
     // 4. Initialize MCP Service (Experimental)
     info!("Initializing MCP Service...");
     let mut mcp_service = McpService::new();
@@ -219,7 +207,7 @@ async fn main() {
 
     // Gemini
     let gemini_model = if cli.gemini_model != "gemini-2.0-flash" { cli.gemini_model.clone() } else { config.gemini.model.clone() };
-    
+
     if google_oauth::has_gemini_cli_credentials().await {
         info!("Using Gemini with gemini-cli OAuth credentials.");
         let gemini = GeminiOAuthProvider::new(gemini_model);
@@ -259,8 +247,70 @@ async fn main() {
         return;
     }
 
+    // Check if prompt is provided
+    if let Some(prompt) = &cli.prompt {
+        // Single Shot Mode
+        process_prompt(prompt, &providers, &cli, cli.consensus).await;
+    } else {
+        // REPL Mode
+        println!("🤖 Gestalt REPL (v0.1.0)");
+        println!("Type '/exit' to quit, '/clear' to clear history.");
+        
+        let mut rl = DefaultEditor::new().unwrap();
+        if rl.load_history("history.txt").is_err() {
+            println!("No previous history.");
+        }
+
+        loop {
+            let readline = rl.readline(">> ");
+            match readline {
+                Ok(line) => {
+                    let line = line.trim();
+                    if line.is_empty() { continue; }
+                    
+                    rl.add_history_entry(line).unwrap();
+
+                    if line == "/exit" {
+                        break;
+                    }
+                    if line == "/clear" {
+                        rl.clear_history().unwrap();
+                        println!("History cleared.");
+                        continue;
+                    }
+                    if line == "/config" {
+                        println!("{:#?}", config);
+                        continue;
+                    }
+
+                    process_prompt(line, &providers, &cli, cli.consensus).await;
+                },
+                Err(ReadlineError::Interrupted) => {
+                    println!("CTRL-C");
+                    break;
+                },
+                Err(ReadlineError::Eof) => {
+                    println!("CTRL-D");
+                    break;
+                },
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                    break;
+                }
+            }
+        }
+        rl.save_history("history.txt").unwrap();
+    }
+}
+
+async fn process_prompt(
+    prompt: &str, 
+    providers: &Vec<(String, Arc<dyn LlmProvider>)>, 
+    cli: &Cli, 
+    consensus: bool
+) {
     // --- Context Engine ---
-    let mut final_prompt = prompt.clone();
+    let mut final_prompt = prompt.to_string();
     if cli.context {
         info!("🧠 Context Engine: Analyzing project...");
         let root = Path::new(".");
@@ -288,9 +338,9 @@ async fn main() {
         info!("🧠 Context Engine: Added {} chars of context.", context_str.len());
     }
 
-    if cli.consensus {
+    if consensus {
         info!("Starting Gestalt Agent Consensus...");
-        let service = ConsensusService::new(providers);
+        let service = ConsensusService::new(providers.clone());
         let result = service.ask_all(&final_prompt).await;
 
         match serde_json::to_string_pretty(&result) {
@@ -298,8 +348,7 @@ async fn main() {
             Err(e) => eprintln!("Failed to serialize result: {}", e),
         }
     } else {
-        info!("Running in Single-Model Mode (Consensus Disabled)");
-        // Pick the first available provider (Gemini > Qwen > OpenAI > Ollama)
+        // Pick the first available provider
         if let Some((name, provider)) = providers.first() {
             info!("Using primary provider: {}", name);
             let request = LlmRequest {
@@ -308,9 +357,33 @@ async fn main() {
                 temperature: 0.7,
                 max_tokens: None,
             };
-            match provider.generate(request).await {
-                Ok(response) => println!("{}", response.content),
-                Err(e) => eprintln!("Error from {}: {}", name, e),
+            
+            // Try streaming first
+            match provider.stream(request.clone()).await {
+                Ok(mut stream) => {
+                    print!("🤖 ");
+                    std::io::stdout().flush().unwrap();
+                    while let Some(chunk_result) = stream.next().await {
+                        match chunk_result {
+                            Ok(chunk) => {
+                                print!("{}", chunk);
+                                std::io::stdout().flush().unwrap();
+                            }
+                            Err(e) => {
+                                eprintln!("\nStream Error: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                    println!(); // Newline at end
+                }
+                Err(_) => {
+                    // Fallback to generate if stream not implemented
+                    match provider.generate(request).await {
+                        Ok(response) => println!("{}", response.content),
+                        Err(e) => eprintln!("Error from {}: {}", name, e),
+                    }
+                }
             }
         }
     }

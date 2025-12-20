@@ -6,6 +6,7 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use futures::stream::BoxStream;
 
 use uuid::Uuid;
 
@@ -158,7 +159,7 @@ impl LlmProvider for GeminiOAuthProvider {
         })
     }
 
-    async fn stream(&self, _request: LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<String, LlmError>>, LlmError> {
+    async fn stream(&self, _request: LlmRequest) -> Result<BoxStream<'static, Result<String, LlmError>>, LlmError> {
         Err(LlmError::Provider("Streaming not implemented yet for GeminiOAuth".to_string()))
     }
 }

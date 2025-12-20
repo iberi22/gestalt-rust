@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::json;
+use futures::stream::BoxStream;
 
 use crate::ports::outbound::llm_provider::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 
@@ -64,7 +65,7 @@ impl LlmProvider for OllamaProvider {
         })
     }
 
-    async fn stream(&self, _request: LlmRequest) -> Result<tokio::sync::mpsc::Receiver<Result<String, LlmError>>, LlmError> {
+    async fn stream(&self, _request: LlmRequest) -> Result<BoxStream<'static, Result<String, LlmError>>, LlmError> {
         Err(LlmError::Provider("Streaming not implemented yet for Ollama".to_string()))
     }
 }
