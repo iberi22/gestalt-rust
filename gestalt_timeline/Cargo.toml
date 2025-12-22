@@ -44,6 +44,13 @@ async-trait = "0.1"
 # Environment
 dotenvy = "0.15"
 
+# AWS Bedrock
+aws-config = "1.5"
+aws-sdk-bedrockruntime = "1.71"
+
+# For streaming responses
+futures = "0.3"
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.0"

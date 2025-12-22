@@ -3,8 +3,17 @@
 use clap::Parser;
 use gestalt_timeline::cli::{Cli, Commands};
 use gestalt_timeline::db::SurrealClient;
-use gestalt_timeline::services::{AgentService, ProjectService, TaskService, TimelineService, WatchService};
+use gestalt_timeline::services::{
+    AgentService, LLMService, OrchestrationAction, ProjectService,
+    TaskService, TimelineService, WatchService
+};
+use surrealdb::sql::Thing;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+/// Helper to convert Option<Thing> to String for display
+fn thing_to_string(thing: &Option<Thing>) -> String {
+    thing.as_ref().map(|t| t.to_string()).unwrap_or_else(|| "unknown".to_string())
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -40,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&project)?);
             } else {
-                println!("✅ Project created: {} (ID: {})", project.name, project.id);
+                println!("✅ Project created: {} (ID: {})", project.name, thing_to_string(&project.id));
             }
         }
 
@@ -72,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     println!("📋 Projects:");
                     for p in projects {
-                        println!("  • {} [{}] - {}", p.name, p.status, p.id);
+                        println!("  • {} [{}] - {}", p.name, p.status, thing_to_string(&p.id));
                     }
                 }
             }
@@ -163,7 +172,7 @@ async fn main() -> anyhow::Result<()> {
             // Get project ID first
             let proj = project_service.get_by_name(&project).await?;
             if let Some(p) = proj {
-                println!("📡 Subscribed to project: {} ({})", project, p.id);
+                println!("📡 Subscribed to project: {} ({})", project, thing_to_string(&p.id));
 
                 // Setup Ctrl+C handler
                 let watch_service_clone = watch_service.clone();
@@ -173,8 +182,9 @@ async fn main() -> anyhow::Result<()> {
                 });
 
                 // Start watching with project filter
+                let project_id_str = thing_to_string(&p.id);
                 watch_service
-                    .start_watching(&agent_id, Some(&p.id), None)
+                    .start_watching(&agent_id, Some(&project_id_str), None)
                     .await?;
             } else {
                 println!("❌ Project not found: {}", project);
@@ -223,7 +233,118 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
+
+        Commands::AiChat { message } => {
+            // Initialize LLM service
+            let llm_service = LLMService::new(db.clone(), timeline_service.clone()).await?;
+
+            println!("🤖 Sending message to Claude Sonnet 4.5...");
+            let response = llm_service.chat(&agent_id, &message).await?;
+
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&response)?);
+            } else {
+                println!("\n💬 Claude:\n{}", response.content);
+                println!("\n📊 Tokens: {} in / {} out", response.input_tokens, response.output_tokens);
+            }
+        }
+
+        Commands::AiOrchestrate { workflow, project, dry_run } => {
+            // Initialize LLM service
+            let llm_service = LLMService::new(db.clone(), timeline_service.clone()).await?;
+
+            println!("🎯 Orchestrating workflow with Claude Sonnet 4.5...");
+            let actions = llm_service.orchestrate(&agent_id, &workflow, project.as_deref()).await?;
+
+            if cli.json {
+                println!("{}", serde_json::to_string_pretty(&actions)?);
+            } else {
+                println!("\n📋 Planned Actions:");
+                for (i, action) in actions.iter().enumerate() {
+                    match action {
+                        OrchestrationAction::CreateProject { name, description } => {
+                            println!("  {}. Create project: '{}' {}", i + 1, name,
+                                description.as_ref().map(|d| format!("({})", d)).unwrap_or_default());
+                        }
+                        OrchestrationAction::CreateTask { project, description } => {
+                            println!("  {}. Create task in '{}': {}", i + 1, project, description);
+                        }
+                        OrchestrationAction::RunTask { task_id } => {
+                            println!("  {}. Run task: {}", i + 1, task_id);
+                        }
+                        OrchestrationAction::ListProjects => {
+                            println!("  {}. List all projects", i + 1);
+                        }
+                        OrchestrationAction::ListTasks { project } => {
+                            println!("  {}. List tasks{}", i + 1,
+                                project.as_ref().map(|p| format!(" for '{}'", p)).unwrap_or_default());
+                        }
+                        OrchestrationAction::GetStatus { project } => {
+                            println!("  {}. Get status of '{}'", i + 1, project);
+                        }
+                        OrchestrationAction::Chat { response } => {
+                            println!("  {}. 💬 {}", i + 1, response);
+                        }
+                    }
+                }
+
+                if dry_run {
+                    println!("\n⚠️  Dry run mode - no actions executed");
+                } else {
+                    println!("\n🚀 Executing actions...");
+                    for action in actions {
+                        match action {
+                            OrchestrationAction::CreateProject { name, .. } => {
+                                match project_service.create_project(&name, &agent_id).await {
+                                    Ok(p) => println!("  ✅ Created project: {}", p.name),
+                                    Err(e) => println!("  ❌ Failed to create project: {}", e),
+                                }
+                            }
+                            OrchestrationAction::CreateTask { project, description } => {
+                                match task_service.create_task(&project, &description, &agent_id).await {
+                                    Ok(t) => println!("  ✅ Created task: {}", t.description),
+                                    Err(e) => println!("  ❌ Failed to create task: {}", e),
+                                }
+                            }
+                            OrchestrationAction::RunTask { task_id } => {
+                                match task_service.run_task(&task_id, &agent_id).await {
+                                    Ok(r) => println!("  ✅ Task completed: {:?}", r.status),
+                                    Err(e) => println!("  ❌ Failed to run task: {}", e),
+                                }
+                            }
+                            OrchestrationAction::ListProjects => {
+                                let projects = project_service.list_projects().await?;
+                                println!("  📋 {} projects found", projects.len());
+                            }
+                            OrchestrationAction::ListTasks { project } => {
+                                let tasks = task_service.list_tasks(project.as_deref()).await?;
+                                println!("  📋 {} tasks found", tasks.len());
+                            }
+                            OrchestrationAction::GetStatus { project } => {
+                                match project_service.get_status(&project).await {
+                                    Ok(s) => println!("  📊 {}: {}% complete", s.name, s.progress_percent),
+                                    Err(e) => println!("  ❌ Failed to get status: {}", e),
+                                }
+                            }
+                            OrchestrationAction::Chat { response } => {
+                                println!("  💬 {}", response);
+                            }
+                        }
+                    }
+                    println!("\n✅ Orchestration complete!");
+                }
+            }
+        }
     }
+
+    // Explicitly drop services and database client for graceful shutdown
+    // This helps minimize SurrealDB background task cancellation warnings
+    drop(project_service);
+    drop(task_service);
+    drop(watch_service);
+    drop(agent_service);
+    drop(timeline_service);
+    drop(db);
 
     Ok(())
 }

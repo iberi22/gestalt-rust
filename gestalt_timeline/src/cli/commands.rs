@@ -116,4 +116,26 @@ pub enum Commands {
         #[arg(long)]
         online: bool,
     },
+
+    /// Chat with AI orchestrator (Claude Sonnet 4.5)
+    #[command(name = "ai-chat")]
+    AiChat {
+        /// Message to send to Claude
+        message: String,
+    },
+
+    /// Execute workflow via AI orchestrator
+    #[command(name = "ai-orchestrate")]
+    AiOrchestrate {
+        /// Natural language workflow description
+        workflow: String,
+
+        /// Optional project context
+        #[arg(long)]
+        project: Option<String>,
+
+        /// Dry run - show actions without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
 }

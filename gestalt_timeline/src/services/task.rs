@@ -3,11 +3,17 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
 use std::time::Instant;
+use surrealdb::sql::Thing;
 use tracing::{debug, info};
 
 use crate::db::SurrealClient;
 use crate::models::{EventType, Task, TaskResult, TaskStatus};
 use crate::services::TimelineService;
+
+/// Helper to convert Option<Thing> to String
+fn thing_to_string(thing: &Option<Thing>) -> String {
+    thing.as_ref().map(|t| t.to_string()).unwrap_or_default()
+}
 
 /// Service for managing tasks.
 #[derive(Clone)]
@@ -41,14 +47,15 @@ impl TaskService {
             .next()
             .context("Project not found")?;
 
-        let task = Task::new(&project.id, description, agent_id);
+        let project_id_str = thing_to_string(&project.id);
+        let task = Task::new(&project_id_str, description, agent_id);
 
         // Store in database
         let created: Task = self.db.create("tasks", &task).await?;
 
         // Record timeline event
         self.timeline
-            .emit_task_event(agent_id, EventType::TaskCreated, &project.id, &created.id)
+            .emit_task_event(agent_id, EventType::TaskCreated, &project_id_str, &created.id)
             .await?;
 
         Ok(created)
@@ -64,8 +71,9 @@ impl TaskService {
                     self.db.query_with(query, ("name", name)).await?;
 
                 if let Some(project) = projects.into_iter().next() {
+                    let project_id_str = thing_to_string(&project.id);
                     let query = "SELECT * FROM tasks WHERE project_id = $project_id ORDER BY created_at DESC";
-                    self.db.query_with(query, ("project_id", &project.id)).await
+                    self.db.query_with(query, ("project_id", &project_id_str)).await
                 } else {
                     Ok(vec![])
                 }

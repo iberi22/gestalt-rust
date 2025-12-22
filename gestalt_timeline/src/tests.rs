@@ -85,7 +85,8 @@ mod project_tests {
     fn test_project_creation() {
         let project = Project::new("my-project", "agent_1");
 
-        assert!(!project.id.is_empty());
+        // Project ID is None before database assignment
+        assert!(project.id.is_none());
         assert_eq!(project.name, "my-project");
         assert_eq!(project.created_by, "agent_1");
         assert!(matches!(project.status, ProjectStatus::Active));

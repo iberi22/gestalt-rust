@@ -1,47 +1,47 @@
 # 📋 TASK.md - Gestión de Tareas: Gestalt Timeline Orchestrator
 
-_Última actualización: 2025-12-19_
+_Última actualización: 2025-12-20_
 
 ---
 
 ## 🎯 Resumen Ejecutivo y Estado Actual
 
-**Estado General:** 95% - Proyecto casi completo, 24 tests pasando
+**Estado General:** ✅ 100% - Proyecto completo, 27 tests pasando
 
-MVP completo. Todas las fases implementadas: CLI base, tiempo real, multi-agente. 24 tests (14 unitarios + 10 integración) pasando.
+MVP completo. Todas las fases implementadas: CLI base, tiempo real, multi-agente. 27 tests (17 unitarios + 10 integración) pasando.
 
 **Progreso por Componente:**
 - [x] 🏗️ Infraestructura (SurrealDB): 100%
 - [x] 🔗 Servicios (Timeline, Task, Project, Agent, Watch): 100%
 - [x] 🖥️ CLI Interface: 100%
-- [x] 🧪 Testing: 100% (24 tests)
+- [x] 🧪 Testing: 100% (27 tests)
 - [x] 📚 Documentación: 100%
 
 ---
 
-## 🚀 Fase 1: MVP Base (Actual)
+## 🚀 Fase 1: MVP Base
 
 **Objetivo:** Crear el sistema CLI funcional con persistencia en SurrealDB y línea de tiempo.
 
 | ID | Tarea | Prioridad | Estado | Responsable |
 |----|-------|-----------|--------|-------------|
-| F1-01 | Crear crate `gestalt_timeline` | ALTA | ⬜ Pendiente | Agent |
-| F1-02 | Configurar dependencias (tokio, surrealdb, clap) | ALTA | ⬜ Pendiente | Agent |
-| F1-03 | Implementar conexión SurrealDB | ALTA | ⬜ Pendiente | Agent |
-| F1-04 | Definir modelos (TimelineEvent, Project, Task) | ALTA | ⬜ Pendiente | Agent |
-| F1-05 | Implementar Timeline Service | ALTA | ⬜ Pendiente | Agent |
-| F1-06 | Implementar Project Service | MEDIA | ⬜ Pendiente | Agent |
-| F1-07 | Implementar Task Service | MEDIA | ⬜ Pendiente | Agent |
-| F1-08 | Crear CLI con comandos base | ALTA | ⬜ Pendiente | Agent |
-| F1-09 | Implementar `add-project` | ALTA | ⬜ Pendiente | Agent |
-| F1-10 | Implementar `add-task` | ALTA | ⬜ Pendiente | Agent |
-| F1-11 | Implementar `run-task` (async) | ALTA | ⬜ Pendiente | Agent |
-| F1-12 | Implementar `list-projects` / `list-tasks` | MEDIA | ⬜ Pendiente | Agent |
-| F1-13 | Implementar `status` | MEDIA | ⬜ Pendiente | Agent |
-| F1-14 | Implementar `timeline` | ALTA | ⬜ Pendiente | Agent |
-| F1-15 | Añadir flag `--json` para salida JSON | MEDIA | ⬜ Pendiente | Agent |
-| F1-16 | Tests unitarios para servicios | MEDIA | ⬜ Pendiente | Agent |
-| F1-17 | Tests de integración CLI | MEDIA | ⬜ Pendiente | Agent |
+| F1-01 | Crear crate `gestalt_timeline` | ALTA | ✅ Completado | Agent |
+| F1-02 | Configurar dependencias (tokio, surrealdb, clap) | ALTA | ✅ Completado | Agent |
+| F1-03 | Implementar conexión SurrealDB | ALTA | ✅ Completado | Agent |
+| F1-04 | Definir modelos (TimelineEvent, Project, Task) | ALTA | ✅ Completado | Agent |
+| F1-05 | Implementar Timeline Service | ALTA | ✅ Completado | Agent |
+| F1-06 | Implementar Project Service | MEDIA | ✅ Completado | Agent |
+| F1-07 | Implementar Task Service | MEDIA | ✅ Completado | Agent |
+| F1-08 | Crear CLI con comandos base | ALTA | ✅ Completado | Agent |
+| F1-09 | Implementar `add-project` | ALTA | ✅ Completado | Agent |
+| F1-10 | Implementar `add-task` | ALTA | ✅ Completado | Agent |
+| F1-11 | Implementar `run-task` (async) | ALTA | ✅ Completado | Agent |
+| F1-12 | Implementar `list-projects` / `list-tasks` | MEDIA | ✅ Completado | Agent |
+| F1-13 | Implementar `status` | MEDIA | ✅ Completado | Agent |
+| F1-14 | Implementar `timeline` | ALTA | ✅ Completado | Agent |
+| F1-15 | Añadir flag `--json` para salida JSON | MEDIA | ✅ Completado | Agent |
+| F1-16 | Tests unitarios para servicios | MEDIA | ✅ Completado | Agent |
+| F1-17 | Tests de integración CLI | MEDIA | ✅ Completado | Agent |
 
 **Leyenda de Estado:**
 - `⬜ Pendiente`
@@ -71,21 +71,35 @@ MVP completo. Todas las fases implementadas: CLI base, tiempo real, multi-agente
 
 | ID | Tarea | Prioridad | Estado | Responsable |
 |----|-------|-----------|--------|-------------|
-| F3-01 | Registro de agentes conectados | ALTA | ⬜ Pendiente | Agent |
-| F3-02 | Identificación de agente por env var | MEDIA | ⬜ Pendiente | Agent |
-| F3-03 | Logs por agente en timeline | MEDIA | ⬜ Pendiente | Agent |
-| F3-04 | Protocolo de comunicación inter-agente | BAJA | ⬜ Pendiente | Agent |
+| F3-01 | Registro de agentes conectados | ALTA | ✅ Completado | Agent |
+| F3-02 | Identificación de agente por env var | MEDIA | ✅ Completado | Agent |
+| F3-03 | Logs por agente en timeline | MEDIA | ✅ Completado | Agent |
+| F3-04 | Protocolo de comunicación inter-agente | BAJA | ✅ Completado | Agent |
+
+---
+
+## 🚀 Fase 4: Integración AI (AWS Bedrock)
+
+**Objetivo:** Orquestar flujos de trabajo mediante Claude Sonnet 4.5.
+
+| ID | Tarea | Prioridad | Estado | Responsable |
+|----|-------|-----------|--------|-------------|
+| F4-01 | Agregar dependencias AWS SDK | ALTA | ✅ Completado | Agent |
+| F4-02 | Implementar LLMService | ALTA | ✅ Completado | Agent |
+| F4-03 | Comando `ai-chat` | ALTA | ✅ Completado | Agent |
+| F4-04 | Comando `ai-orchestrate` | ALTA | ✅ Completado | Agent |
+| F4-05 | Dry-run mode para orquestación | MEDIA | ✅ Completado | Agent |
 
 ---
 
 ## ✅ Hitos Principales
 
-- [ ] **Hito 1:** Documentación inicial completada
-- [ ] **Hito 2:** CLI base funcional con `add-project` y `list-projects`
-- [ ] **Hito 3:** Timeline Service operativo
-- [ ] **Hito 4:** Ejecución asincrónica de tareas
-- [ ] **Hito 5:** Modo `watch` en tiempo real
-- [ ] **Hito 6:** Multi-agente coordinado
+- [x] **Hito 1:** Documentación inicial completada
+- [x] **Hito 2:** CLI base funcional con `add-project` y `list-projects`
+- [x] **Hito 3:** Timeline Service operativo
+- [x] **Hito 4:** Ejecución asincrónica de tareas
+- [x] **Hito 5:** Modo `watch` en tiempo real
+- [x] **Hito 6:** Multi-agente coordinado
 
 ---
 
@@ -102,7 +116,7 @@ MVP completo. Todas las fases implementadas: CLI base, tiempo real, multi-agente
 
 | ID | Tarea | Prioridad | Estado | Responsable |
 |----|-------|-----------|--------|-------------|
-| _Vacío por ahora_ | | | | |
+| DD-01 | Fix type mismatch: Project.id Option<Thing> vs String | ALTA | ✅ Completado | Agent |
 
 ---
 

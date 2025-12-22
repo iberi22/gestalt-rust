@@ -12,4 +12,8 @@ mod tests;
 
 pub use db::SurrealClient;
 pub use models::{EventType, Project, Task, TimelineEvent};
-pub use services::{Agent, AgentService, AgentStatus, AgentType, ProjectService, TaskService, TimelineService, WatchService};
+pub use services::{
+    Agent, AgentService, AgentStatus, AgentType,
+    LLMResponse, LLMService, OrchestrationAction,
+    ProjectService, TaskService, TimelineService, WatchService
+};

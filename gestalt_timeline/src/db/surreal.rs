@@ -73,8 +73,8 @@ impl SurrealClient {
             DEFINE FIELD event_type ON timeline_events TYPE string;
             DEFINE FIELD project_id ON timeline_events TYPE option<string>;
             DEFINE FIELD task_id ON timeline_events TYPE option<string>;
-            DEFINE FIELD payload ON timeline_events TYPE object;
-            DEFINE FIELD metadata ON timeline_events TYPE object;
+            DEFINE FIELD payload ON timeline_events TYPE option<object>;
+            DEFINE FIELD metadata ON timeline_events TYPE option<object>;
             DEFINE INDEX idx_timestamp ON timeline_events FIELDS timestamp;
             DEFINE INDEX idx_project ON timeline_events FIELDS project_id;
             DEFINE INDEX idx_agent ON timeline_events FIELDS agent_id;

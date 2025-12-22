@@ -83,8 +83,7 @@ impl TimelineEvent {
 }
 
 /// Types of events that can occur in the timeline.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EventType {
     /// A new project was created
     ProjectCreated,
@@ -110,6 +109,43 @@ pub enum EventType {
     Custom(String),
 }
 
+impl Serialize for EventType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for EventType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "project_created" => Ok(EventType::ProjectCreated),
+            "project_updated" => Ok(EventType::ProjectUpdated),
+            "project_deleted" => Ok(EventType::ProjectDeleted),
+            "task_created" => Ok(EventType::TaskCreated),
+            "task_started" => Ok(EventType::TaskStarted),
+            "task_completed" => Ok(EventType::TaskCompleted),
+            "task_failed" => Ok(EventType::TaskFailed),
+            "agent_connected" => Ok(EventType::AgentConnected),
+            "agent_disconnected" => Ok(EventType::AgentDisconnected),
+            "command_executed" => Ok(EventType::CommandExecuted),
+            other => {
+                if let Some(custom) = other.strip_prefix("custom:") {
+                    Ok(EventType::Custom(custom.to_string()))
+                } else {
+                    Ok(EventType::Custom(other.to_string()))
+                }
+            }
+        }
+    }
+}
+
 impl fmt::Display for EventType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -123,7 +159,13 @@ impl fmt::Display for EventType {
             EventType::AgentConnected => write!(f, "agent_connected"),
             EventType::AgentDisconnected => write!(f, "agent_disconnected"),
             EventType::CommandExecuted => write!(f, "command_executed"),
-            EventType::Custom(s) => write!(f, "custom:{}", s),
+            EventType::Custom(s) => {
+                if s.starts_with("custom:") {
+                    write!(f, "{}", s)
+                } else {
+                    write!(f, "custom:{}", s)
+                }
+            }
         }
     }
 }

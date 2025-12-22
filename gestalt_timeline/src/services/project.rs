@@ -1,11 +1,17 @@
 //! Project Service
 
 use anyhow::{Context, Result};
+use surrealdb::sql::Thing;
 use tracing::debug;
 
 use crate::db::SurrealClient;
 use crate::models::{EventType, Project, ProjectStatus, ProjectStatusInfo, Task};
 use crate::services::TimelineService;
+
+/// Helper to convert Option<Thing> to String
+fn thing_to_string(thing: &Option<Thing>) -> String {
+    thing.as_ref().map(|t| t.to_string()).unwrap_or_default()
+}
 
 /// Service for managing projects.
 #[derive(Clone)]
@@ -30,8 +36,9 @@ impl ProjectService {
         let created: Project = self.db.create("projects", &project).await?;
 
         // Record timeline event
+        let project_id_str = thing_to_string(&created.id);
         self.timeline
-            .emit_project_event(agent_id, EventType::ProjectCreated, &created.id)
+            .emit_project_event(agent_id, EventType::ProjectCreated, &project_id_str)
             .await?;
 
         Ok(created)
@@ -62,8 +69,9 @@ impl ProjectService {
             .context("Project not found")?;
 
         // Get tasks for this project
+        let project_id_str = thing_to_string(&project.id);
         let query = "SELECT * FROM tasks WHERE project_id = $project_id";
-        let tasks: Vec<Task> = self.db.query_with(query, ("project_id", &project.id)).await?;
+        let tasks: Vec<Task> = self.db.query_with(query, ("project_id", &project_id_str)).await?;
 
         let total_tasks = tasks.len();
         let completed_tasks = tasks
@@ -78,7 +86,7 @@ impl ProjectService {
         };
 
         Ok(ProjectStatusInfo {
-            id: project.id,
+            id: project_id_str,
             name: project.name,
             status: project.status,
             total_tasks,
