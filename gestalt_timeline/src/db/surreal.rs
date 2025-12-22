@@ -16,43 +16,27 @@ pub struct SurrealClient {
 }
 
 impl SurrealClient {
-    /// Connect to SurrealDB using environment variables.
-    ///
-    /// Environment variables:
-    /// - SURREAL_URL: URL (default: mem:// for in-memory)
-    ///   - mem:// for in-memory database
-    ///   - file://path for persistent RocksDB
-    ///   - ws://host:port for WebSocket
-    /// - SURREAL_USER: Username (default: root)
-    /// - SURREAL_PASS: Password (default: root)
-    /// - SURREAL_NS: Namespace (default: gestalt)
-    /// - SURREAL_DB: Database (default: timeline)
-    pub async fn connect() -> Result<Self> {
-        let url = std::env::var("SURREAL_URL").unwrap_or_else(|_| "mem://".to_string());
-        let user = std::env::var("SURREAL_USER").unwrap_or_else(|_| "root".to_string());
-        let pass = std::env::var("SURREAL_PASS").unwrap_or_else(|_| "root".to_string());
-        let ns = std::env::var("SURREAL_NS").unwrap_or_else(|_| "gestalt".to_string());
-        let db_name = std::env::var("SURREAL_DB").unwrap_or_else(|_| "timeline".to_string());
+    /// Connect to SurrealDB using provided settings.
+    pub async fn connect(config: &crate::config::DatabaseSettings) -> Result<Self> {
+        info!("Connecting to SurrealDB at {}", config.url);
 
-        info!("Connecting to SurrealDB at {}", url);
-
-        let db = surrealdb::engine::any::connect(&url)
+        let db = surrealdb::engine::any::connect(&config.url)
             .await
             .context("Failed to connect to SurrealDB")?;
 
         // Only sign in for remote connections
-        if url.starts_with("ws://") || url.starts_with("wss://") || url.starts_with("http://") || url.starts_with("https://") {
+        if config.url.starts_with("ws://") || config.url.starts_with("wss://") || config.url.starts_with("http://") || config.url.starts_with("https://") {
             db.signin(Root {
-                username: &user,
-                password: &pass,
+                username: &config.user,
+                password: &config.pass,
             })
             .await
             .context("Failed to authenticate with SurrealDB")?;
         }
 
-        db.use_ns(&ns).use_db(&db_name).await?;
+        db.use_ns(&config.namespace).use_db(&config.database).await?;
 
-        info!("Connected to SurrealDB: {}:{}", ns, db_name);
+        info!("Connected to SurrealDB: {}:{}", config.namespace, config.database);
 
         // Initialize schema
         Self::init_schema(&db).await?;
@@ -97,6 +81,7 @@ impl SurrealClient {
             DEFINE FIELD completed_at ON tasks TYPE option<string>;
             DEFINE FIELD created_by ON tasks TYPE string;
             DEFINE FIELD executed_by ON tasks TYPE option<string>;
+            DEFINE FIELD duration_ms ON tasks TYPE option<int>;
             DEFINE INDEX idx_project_id ON tasks FIELDS project_id;
             DEFINE INDEX idx_status ON tasks FIELDS status;
             "#,

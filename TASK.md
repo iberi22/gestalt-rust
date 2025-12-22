@@ -107,8 +107,8 @@ MVP completo. Todas las fases implementadas: CLI base, tiempo real, multi-agente
 
 | ID | Tarea | Prioridad | Estado | Responsable |
 |----|-------|-----------|--------|-------------|
-| TD-01 | Migrar configuración a archivo TOML | BAJA | ⬜ Pendiente | Agent |
-| TD-02 | Añadir métricas de rendimiento | BAJA | ⬜ Pendiente | Agent |
+| TD-01 | Migrar configuración a archivo TOML | BAJA | ✅ Completado | Agent |
+| TD-02 | Añadir métricas de rendimiento | BAJA | ✅ Completado | Agent |
 
 ---
 

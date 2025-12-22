@@ -119,6 +119,7 @@ impl TaskService {
         task.status = TaskStatus::Completed;
         task.completed_at = Some(Utc::now());
         task.updated_at = Utc::now();
+        task.duration_ms = Some(duration_ms);
         self.db.update("tasks", task_id, &task).await?;
 
         // Record completion event

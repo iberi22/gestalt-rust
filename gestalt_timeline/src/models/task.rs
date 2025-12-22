@@ -35,6 +35,10 @@ pub struct Task {
     /// Agent that executed the task (if executed)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub executed_by: Option<String>,
+
+    /// Duration of execution in milliseconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
 }
 
 impl Task {
@@ -51,6 +55,7 @@ impl Task {
             completed_at: None,
             created_by: created_by.to_string(),
             executed_by: None,
+            duration_ms: None,
         }
     }
 }

@@ -12,8 +12,7 @@ use crate::db::SurrealClient;
 use crate::models::{EventType, Project, Task};
 use crate::services::TimelineService;
 
-/// Default Claude Sonnet 4.5 inference profile ID (US region, on-demand supported)
-const DEFAULT_MODEL_ID: &str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0";
+
 
 /// LLM Service for AI-powered orchestration.
 #[derive(Clone)]
@@ -31,6 +30,7 @@ pub struct LLMResponse {
     pub model_id: String,
     pub input_tokens: i32,
     pub output_tokens: i32,
+    pub duration_ms: u64,
 }
 
 /// Orchestration action parsed from LLM response
@@ -47,24 +47,24 @@ pub enum OrchestrationAction {
 
 impl LLMService {
     /// Create a new LLMService with AWS Bedrock client.
-    pub async fn new(db: SurrealClient, timeline: TimelineService) -> Result<Self> {
+    pub async fn new(
+        db: SurrealClient,
+        timeline: TimelineService,
+        config: &crate::config::CognitionSettings
+    ) -> Result<Self> {
         info!("🤖 Initializing LLM Service with AWS Bedrock...");
 
         // Load AWS config from environment
-        let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-        let bedrock_client = BedrockClient::new(&config);
+        let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
+        let bedrock_client = BedrockClient::new(&aws_config);
 
-        // Get model ID from env or use default
-        let model_id = std::env::var("BEDROCK_MODEL_ID")
-            .unwrap_or_else(|_| DEFAULT_MODEL_ID.to_string());
-
-        info!("📦 Using model: {}", model_id);
+        info!("📦 Using model: {}", config.model_id);
 
         Ok(Self {
             bedrock_client,
             db,
             timeline,
-            model_id,
+            model_id: config.model_id.clone(),
         })
     }
 
@@ -86,6 +86,7 @@ impl LLMService {
     /// Send a chat message to Claude and get a response.
     pub async fn chat(&self, agent_id: &str, message: &str) -> Result<LLMResponse> {
         debug!("💬 Sending message to Claude: {}", message);
+        let start = std::time::Instant::now();
 
         // Build the message
         let user_message = Message::builder()
@@ -128,18 +129,21 @@ impl LLMService {
         let input_tokens = usage.map(|u| u.input_tokens()).unwrap_or(0);
         let output_tokens = usage.map(|u| u.output_tokens()).unwrap_or(0);
 
+        let end = start.elapsed().as_millis() as u64;
+
         // Record in timeline
         self.timeline
             .emit(agent_id, EventType::Custom("llm_chat".to_string()))
             .await?;
 
-        info!("✅ Claude response received ({} tokens)", output_tokens);
+        info!("✅ Claude response received ({} tokens in {}ms)", output_tokens, end);
 
         Ok(LLMResponse {
             content,
             model_id: self.model_id.clone(),
             input_tokens,
             output_tokens,
+            duration_ms: end,
         })
     }
 
@@ -329,11 +333,21 @@ mod tests {
 
     async fn setup_llm() -> LLMService {
         // Use memory database for tests
-        let db = SurrealClient::connect().await.unwrap();
+        let db_settings = crate::config::DatabaseSettings {
+            url: "mem://".to_string(),
+            user: "root".to_string(),
+            pass: "root".to_string(),
+            namespace: "test".to_string(),
+            database: "test".to_string(),
+        };
+
+        let db = SurrealClient::connect(&db_settings).await.unwrap();
         let timeline = TimelineService::new(db.clone());
+
         // We can pass a default client since we only test non-async logic here
         let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let bedrock_client = BedrockClient::new(&config);
+
         LLMService::with_client(bedrock_client, db, timeline, "test-model".to_string())
     }
 

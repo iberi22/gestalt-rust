@@ -3,6 +3,7 @@
 use clap::Parser;
 use gestalt_timeline::cli::{Cli, Commands};
 use gestalt_timeline::db::SurrealClient;
+use gestalt_timeline::config::Settings;
 use gestalt_timeline::services::{
     AgentService, LLMService, OrchestrationAction, ProjectService,
     TaskService, TimelineService, WatchService
@@ -26,11 +27,14 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables
     dotenvy::dotenv().ok();
 
+    // Load configuration
+    let settings = Settings::new()?;
+
     // Parse CLI arguments
     let cli = Cli::parse();
 
     // Initialize database connection
-    let db = SurrealClient::connect().await?;
+    let db = SurrealClient::connect(&settings.database).await?;
 
     // Initialize services
     let timeline_service = TimelineService::new(db.clone());
@@ -40,7 +44,8 @@ async fn main() -> anyhow::Result<()> {
     let agent_service = AgentService::new(db.clone(), timeline_service.clone());
 
     // Get agent ID from environment or use default
-    let agent_id = std::env::var("GESTALT_AGENT_ID").unwrap_or_else(|_| "cli_default".to_string());
+    // Get agent ID from configuration
+    let agent_id = settings.agent.id.clone();
 
     // Execute command
     match cli.command {
@@ -236,7 +241,7 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::AiChat { message } => {
             // Initialize LLM service
-            let llm_service = LLMService::new(db.clone(), timeline_service.clone()).await?;
+            let llm_service = LLMService::new(db.clone(), timeline_service.clone(), &settings.cognition).await?;
 
             println!("🤖 Sending message to Claude Sonnet 4.5...");
             let response = llm_service.chat(&agent_id, &message).await?;
@@ -251,7 +256,7 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::AiOrchestrate { workflow, project, dry_run } => {
             // Initialize LLM service
-            let llm_service = LLMService::new(db.clone(), timeline_service.clone()).await?;
+            let llm_service = LLMService::new(db.clone(), timeline_service.clone(), &settings.cognition).await?;
 
             println!("🎯 Orchestrating workflow with Claude Sonnet 4.5...");
             let actions = llm_service.orchestrate(&agent_id, &workflow, project.as_deref()).await?;

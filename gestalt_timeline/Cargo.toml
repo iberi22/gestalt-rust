@@ -50,6 +50,7 @@ aws-sdk-bedrockruntime = "1.71"
 
 # For streaming responses
 futures = "0.3"
+config = "0.15.19"
 
 [dev-dependencies]
 assert_cmd = "2.0"
