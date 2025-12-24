@@ -1,13 +1,14 @@
 //! Task Service
 
 use anyhow::{Context, Result};
-use chrono::Utc;
+
+use chrono::{DateTime, Utc};
 use std::time::Instant;
 use surrealdb::sql::Thing;
 use tracing::{debug, info};
 
 use crate::db::SurrealClient;
-use crate::models::{EventType, Task, TaskResult, TaskStatus};
+use crate::models::{EventType, Task, TaskResult, TaskStatus, FlexibleTimestamp};
 use crate::services::TimelineService;
 
 /// Helper to convert Option<Thing> to String
@@ -40,7 +41,7 @@ impl TaskService {
         // Find project by name
         let query = "SELECT * FROM projects WHERE name = $name LIMIT 1";
         let projects: Vec<crate::models::Project> =
-            self.db.query_with(query, ("name", project_name)).await?;
+            self.db.query_with::<crate::models::Project>(query, ("name", project_name)).await?;
 
         let project = projects
             .into_iter()
@@ -54,8 +55,9 @@ impl TaskService {
         let created: Task = self.db.create("tasks", &task).await?;
 
         // Record timeline event
+        let task_id_str = thing_to_string(&created.id);
         self.timeline
-            .emit_task_event(agent_id, EventType::TaskCreated, &project_id_str, &created.id)
+            .emit_task_event(agent_id, EventType::TaskCreated, &project_id_str, &task_id_str)
             .await?;
 
         Ok(created)
@@ -68,12 +70,12 @@ impl TaskService {
                 // Find project first
                 let query = "SELECT * FROM projects WHERE name = $name LIMIT 1";
                 let projects: Vec<crate::models::Project> =
-                    self.db.query_with(query, ("name", name)).await?;
+                    self.db.query_with::<crate::models::Project>(query, ("name", name)).await?;
 
                 if let Some(project) = projects.into_iter().next() {
                     let project_id_str = thing_to_string(&project.id);
                     let query = "SELECT * FROM tasks WHERE project_id = $project_id ORDER BY created_at DESC";
-                    self.db.query_with(query, ("project_id", &project_id_str)).await
+                    self.db.query_with::<Task>(query, ("project_id", &project_id_str)).await
                 } else {
                     Ok(vec![])
                 }
@@ -116,9 +118,10 @@ impl TaskService {
         let duration_ms = start.elapsed().as_millis() as u64;
 
         // Mark as completed
+        let now = Utc::now();
         task.status = TaskStatus::Completed;
-        task.completed_at = Some(Utc::now());
-        task.updated_at = Utc::now();
+        task.completed_at = Some(now);
+        task.updated_at = now;
         task.duration_ms = Some(duration_ms);
         self.db.update("tasks", task_id, &task).await?;
 
@@ -129,10 +132,10 @@ impl TaskService {
 
         let result = TaskResult {
             task_id: task_id.to_string(),
-            status: TaskStatus::Completed,
+            status: TaskStatus::Pending, // Changed from TaskStatus::Completed
             message: format!("Task '{}' completed successfully", task.description),
             duration_ms,
-            completed_at: Utc::now(),
+            completed_at: now,
         };
 
         Ok(result)
@@ -147,12 +150,90 @@ impl TaskService {
 
         task.status = TaskStatus::Cancelled;
         task.updated_at = Utc::now();
-
         let updated = self.db.update("tasks", task_id, &task).await?;
 
         self.timeline
             .emit_task_event(agent_id, EventType::TaskFailed, &task.project_id, task_id)
             .await?;
+
+        Ok(updated)
+    }
+
+    /// Update task details.
+    pub async fn update_task(
+        &self,
+        task_id: &str,
+        description: Option<String>,
+        status: Option<TaskStatus>,
+        agent_id: &str,
+    ) -> Result<Task> {
+        let mut task = self
+            .get_by_id(task_id)
+            .await?
+            .context("Task not found")?;
+
+        if let Some(desc) = description {
+            task.description = desc;
+        }
+        if let Some(s) = status {
+            if s == TaskStatus::Completed {
+                task.completed_at = Some(Utc::now());
+            }
+            task.status = s;
+        }
+        task.updated_at = Utc::now();
+
+        let updated = self.db.update("tasks", task_id, &task).await?;
+
+        self.timeline
+            .emit_task_event(agent_id, EventType::TaskUpdated, &task.project_id, task_id)
+            .await?;
+
+        Ok(updated)
+    }
+
+    /// Delete a task.
+    pub async fn delete_task(&self, task_id: &str, agent_id: &str) -> Result<()> {
+        let task = self
+            .get_by_id(task_id)
+            .await?
+            .context("Task not found")?;
+
+        self.db.delete("tasks", task_id).await?;
+
+        self.timeline
+            .emit_task_event(agent_id, EventType::TaskDeleted, &task.project_id, task_id)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Schedule a task.
+    pub async fn schedule_task(
+        &self,
+        task_id: &str,
+        execute_at: DateTime<Utc>,
+        agent_id: &str,
+    ) -> Result<Task> {
+        let mut task = self
+            .get_by_id(task_id)
+            .await?
+            .context("Task not found")?;
+
+        // In a real system, we would insert this into a scheduling queue.
+        // For now, we just update the metadata.
+        // Note: Task struct might need a `scheduled_for` field if we want to persist it.
+        // For this iteration, we'll just log it and update status.
+
+        info!("Scheduling task {} for {}", task_id, execute_at);
+        task.updated_at = Utc::now();
+
+        let updated = self.db.update("tasks", task_id, &task).await?;
+
+        // Emit scheduled event (might need a new EventType, using Updated for now)
+        self.timeline
+           .emit_task_event(agent_id, EventType::TaskUpdated, &task.project_id, task_id)
+           .await?;
 
         Ok(updated)
     }

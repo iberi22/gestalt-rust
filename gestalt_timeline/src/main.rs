@@ -1,19 +1,78 @@
-//! Gestalt Timeline CLI Entry Point
-
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use clap::Parser;
-use gestalt_timeline::cli::{Cli, Commands};
+use std::io::Write;
+use std::path::Path;
+use gestalt_timeline::cli::{Cli, Commands, repl};
 use gestalt_timeline::db::SurrealClient;
 use gestalt_timeline::config::Settings;
 use gestalt_timeline::services::{
-    AgentService, LLMService, OrchestrationAction, ProjectService,
-    TaskService, TimelineService, WatchService
+    AgentService, LLMService, GeminiService, OrchestrationAction, ProjectService,
+    TaskService, TimelineService, WatchService, AgentRuntime, start_server, Cognition, AuthService
 };
+use gestalt_core::context::{detector, scanner};
 use surrealdb::sql::Thing;
+use std::sync::Arc;
+use tracing::{info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+// Re-export specific models if needed for matching
+use gestalt_timeline::models::{TaskStatus};
 
 /// Helper to convert Option<Thing> to String for display
 fn thing_to_string(thing: &Option<Thing>) -> String {
     thing.as_ref().map(|t| t.to_string()).unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Helper to initialize cognition service based on configuration
+async fn init_cognition(
+    db: &SurrealClient,
+    timeline: &TimelineService,
+    settings: &gestalt_timeline::config::CognitionSettings,
+) -> Result<Arc<dyn Cognition>> {
+    let model_id = &settings.model_id;
+
+    if model_id.to_lowercase().contains("gemini") {
+        let api_key = settings.gemini_api_key.clone()
+            .or_else(|| std::env::var("GEMINI_API_KEY").ok());
+
+        Ok(Arc::new(GeminiService::new(
+            db.clone(),
+            timeline.clone(),
+            model_id.clone(),
+            api_key,
+        )?))
+    } else {
+        let llm_service = LLMService::new(db.clone(), timeline.clone(), settings).await?;
+        Ok(Arc::new(llm_service))
+    }
+}
+
+/// Collect context from the current directory
+fn collect_context(root: &Path) -> String {
+    info!("🧠 Context Engine: Analyzing project...");
+    let project_type = detector::detect_project_type(root);
+    let tree = scanner::generate_directory_tree(root, 2);
+    let files = scanner::scan_markdown_files(root);
+
+    let mut context_str = String::new();
+    context_str.push_str(&format!("Project Type: {}\n", project_type));
+    context_str.push_str("Directory Structure:\n");
+    context_str.push_str(&tree);
+    context_str.push_str("\nMarkdown Context (first 100 lines):\n");
+
+    for file in files {
+        context_str.push_str(&format!("--- File: {} ---\n{}\n\n", file.path, file.content));
+    }
+
+    // Truncate if too long (approx 16k chars ~ 4k tokens)
+    if context_str.len() > 16000 {
+         context_str.truncate(16000);
+         context_str.push_str("\n... (truncated context)");
+    }
+
+    info!("🧠 Context Engine: Added {} chars of context.", context_str.len());
+    context_str
 }
 
 #[tokio::main]
@@ -43,13 +102,34 @@ async fn main() -> anyhow::Result<()> {
     let watch_service = WatchService::new(db.clone(), timeline_service.clone());
     let agent_service = AgentService::new(db.clone(), timeline_service.clone());
 
-    // Get agent ID from environment or use default
     // Get agent ID from configuration
     let agent_id = settings.agent.id.clone();
 
-    // Execute command
+    // Check if we have a direct prompt (Context Engine Mode)
+    if let Some(prompt) = &cli.prompt {
+        // Initialize cognition service
+        let cognition = init_cognition(&db, &timeline_service, &settings.cognition).await?;
+
+        let mut final_prompt = prompt.clone();
+        if cli.context {
+            let context_str = collect_context(Path::new("."));
+            final_prompt = format!("CONTEXT:\n{}\n\nUSER PROMPT:\n{}", context_str, prompt);
+        }
+
+        println!("🤖 Sending message to {}...", cognition.model_id());
+        let response = cognition.chat(&agent_id, &final_prompt).await?;
+
+        if cli.json {
+            println!("{}", serde_json::to_string_pretty(&response)?);
+        } else {
+            println!("\n💬 {}:\n{}", cognition.model_id(), response.content);
+        }
+        return Ok(());
+    }
+
+    // Handle subcommands
     match cli.command {
-        Commands::AddProject { name } => {
+        Some(Commands::AddProject { name }) => {
             let project = project_service.create_project(&name, &agent_id).await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&project)?);
@@ -58,16 +138,77 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::AddTask { project, description } => {
+        Some(Commands::DeleteProject { id }) => {
+            project_service.delete_project(&id, &agent_id).await?;
+            if cli.json {
+                println!("{{ \"status\": \"deleted\", \"id\": \"{}\" }}", id);
+            } else {
+                println!("🗑️ Project deleted: {}", id);
+            }
+        }
+
+        Some(Commands::AddTask { project, description }) => {
             let task = task_service.create_task(&project, &description, &agent_id).await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&task)?);
             } else {
-                println!("✅ Task created: {} (ID: {})", task.description, task.id);
+                println!("✅ Task created: {} (ID: {})", task.description, task.id.as_ref().map(|x| x.to_string()).unwrap_or_else(|| "none".to_string()));
             }
         }
 
-        Commands::RunTask { task_id } => {
+        Some(Commands::UpdateTask { id, description, status }) => {
+            let task_status = if let Some(s) = status {
+                 match s.to_lowercase().as_str() {
+                     "todo" => Some(TaskStatus::Pending),
+                     "inprogress" | "running" => Some(TaskStatus::Running),
+                     "completed" | "done" => Some(TaskStatus::Completed),
+                     "cancelled" | "failed" => Some(TaskStatus::Cancelled), // Mapping failed/cancelled together roughly or user choice
+                     _ => {
+                         eprintln!("Unknown status: {}. Valid: todo, running, completed, cancelled", s);
+                         return Ok(());
+                     }
+                 }
+            } else {
+                None
+            };
+
+            let task = task_service.update_task(&id, description, task_status, &agent_id).await?;
+            if cli.json {
+                 println!("{}", serde_json::to_string_pretty(&task)?);
+            } else {
+                 println!("✏️ Task updated: {}", id);
+            }
+        }
+
+        Some(Commands::DeleteTask { id }) => {
+            task_service.delete_task(&id, &agent_id).await?;
+             if cli.json {
+                println!("{{ \"status\": \"deleted\", \"id\": \"{}\" }}", id);
+            } else {
+                println!("🗑️ Task deleted: {}", id);
+            }
+        }
+
+        Some(Commands::ScheduleTask { id, time }) => {
+            // Simple parsing for now - assumes ISO 8601 or we can try flexible parsing if needed
+            // For MVP, strict ISO or fail
+            let execute_at = match DateTime::parse_from_rfc3339(&time) {
+                Ok(dt) => dt.with_timezone(&Utc),
+                Err(_) => {
+                    eprintln!("Invalid time format. Please use ISO 8601 (e.g., 2023-10-27T10:00:00Z)");
+                    return Ok(());
+                }
+            };
+
+            let task = task_service.schedule_task(&id, execute_at, &agent_id).await?;
+             if cli.json {
+                 println!("{}", serde_json::to_string_pretty(&task)?);
+            } else {
+                 println!("⏰ Task scheduled: {} at {}", id, execute_at);
+            }
+        }
+
+        Some(Commands::RunTask { task_id }) => {
             let result = task_service.run_task(&task_id, &agent_id).await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&result)?);
@@ -76,7 +217,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::ListProjects => {
+        Some(Commands::ListProjects) => {
             let projects = project_service.list_projects().await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&projects)?);
@@ -92,7 +233,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::ListTasks { project } => {
+        Some(Commands::ListTasks { project }) => {
             let tasks = task_service.list_tasks(project.as_deref()).await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&tasks)?);
@@ -102,13 +243,13 @@ async fn main() -> anyhow::Result<()> {
                 } else {
                     println!("📋 Tasks:");
                     for t in tasks {
-                        println!("  • [{}] {} - {}", t.status, t.description, t.id);
+                        println!("  • [{}] {} - {}", t.status, t.description, t.id.as_ref().map(|x| x.to_string()).unwrap_or_else(|| "none".to_string()));
                     }
                 }
             }
         }
 
-        Commands::Status { project } => {
+        Some(Commands::Status { project }) => {
             let status = project_service.get_status(&project).await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&status)?);
@@ -120,7 +261,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::Timeline { since } => {
+        Some(Commands::Timeline { since }) => {
             let events = timeline_service.get_timeline(since.as_deref()).await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&events)?);
@@ -131,17 +272,17 @@ async fn main() -> anyhow::Result<()> {
                     println!("🕐 Timeline:");
                     for e in events {
                         println!("  {} | {} | {} | {}",
-                            e.timestamp.format("%Y-%m-%d %H:%M:%S UTC"),
+                            e.timestamp,
                             e.agent_id,
                             e.event_type,
-                            e.id
+                            e.id.as_ref().map(|x| x.to_string()).unwrap_or_else(|| "none".to_string())
                         );
                     }
                 }
             }
         }
 
-        Commands::Watch { project, events } => {
+        Some(Commands::Watch { project, events }) => {
             // Parse event filter
             let event_filter = events.map(|e| {
                 e.split(',')
@@ -162,7 +303,7 @@ async fn main() -> anyhow::Result<()> {
                 .await?;
         }
 
-        Commands::Broadcast { message, project } => {
+        Some(Commands::Broadcast { message, project }) => {
             let event = watch_service
                 .broadcast_message(&agent_id, &message, project.as_deref())
                 .await?;
@@ -173,7 +314,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::Subscribe { project } => {
+        Some(Commands::Subscribe { project }) => {
             // Get project ID first
             let proj = project_service.get_by_name(&project).await?;
             if let Some(p) = proj {
@@ -196,7 +337,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::AgentConnect { name } => {
+        Some(Commands::AgentConnect { name }) => {
             let agent = agent_service.connect(&agent_id, name.as_deref()).await?;
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&agent)?);
@@ -205,7 +346,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::AgentDisconnect => {
+        Some(Commands::AgentDisconnect {}) => {
             agent_service.disconnect(&agent_id).await?;
             if cli.json {
                 println!(r#"{{"agent_id": "{}", "status": "disconnected"}}"#, agent_id);
@@ -214,7 +355,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Commands::ListAgents { online } => {
+        Some(Commands::ListAgents { online }) => {
             let agents = if online {
                 agent_service.list_online_agents().await?
             } else {
@@ -232,113 +373,102 @@ async fn main() -> anyhow::Result<()> {
                             a.name,
                             a.status,
                             a.agent_type,
-                            a.last_seen.format("%H:%M:%S")
+                            a.last_seen
                         );
                     }
                 }
             }
         }
 
-        Commands::AiChat { message } => {
-            // Initialize LLM service
-            let llm_service = LLMService::new(db.clone(), timeline_service.clone(), &settings.cognition).await?;
+        Some(Commands::AiChat { message }) => {
+            // Initialize cognition service
+            let cognition = init_cognition(&db, &timeline_service, &settings.cognition).await?;
 
-            println!("🤖 Sending message to Claude Sonnet 4.5...");
-            let response = llm_service.chat(&agent_id, &message).await?;
+            println!("🤖 Sending message to {}...", cognition.model_id());
+            let response = cognition.chat(&agent_id, &message).await?;
 
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
             } else {
-                println!("\n💬 Claude:\n{}", response.content);
+                println!("\n💬 {}:\n{}", cognition.model_id(), response.content);
                 println!("\n📊 Tokens: {} in / {} out", response.input_tokens, response.output_tokens);
             }
         }
 
-        Commands::AiOrchestrate { workflow, project, dry_run } => {
-            // Initialize LLM service
-            let llm_service = LLMService::new(db.clone(), timeline_service.clone(), &settings.cognition).await?;
+        Some(Commands::AiOrchestrate { workflow, project: _, dry_run: _ }) => {
+            // Initialize cognition service
+            let cognition = init_cognition(&db, &timeline_service, &settings.cognition).await?;
 
-            println!("🎯 Orchestrating workflow with Claude Sonnet 4.5...");
-            let actions = llm_service.orchestrate(&agent_id, &workflow, project.as_deref()).await?;
+            // Initialize Agent Runtime
+            let runtime = AgentRuntime::new(
+                agent_id.clone(),
+                cognition,
+                project_service.clone(),
+                task_service.clone(),
+                watch_service.clone(),
+                agent_service.clone(),
+            );
 
-            if cli.json {
-                println!("{}", serde_json::to_string_pretty(&actions)?);
-            } else {
-                println!("\n📋 Planned Actions:");
-                for (i, action) in actions.iter().enumerate() {
-                    match action {
-                        OrchestrationAction::CreateProject { name, description } => {
-                            println!("  {}. Create project: '{}' {}", i + 1, name,
-                                description.as_ref().map(|d| format!("({})", d)).unwrap_or_default());
-                        }
-                        OrchestrationAction::CreateTask { project, description } => {
-                            println!("  {}. Create task in '{}': {}", i + 1, project, description);
-                        }
-                        OrchestrationAction::RunTask { task_id } => {
-                            println!("  {}. Run task: {}", i + 1, task_id);
-                        }
-                        OrchestrationAction::ListProjects => {
-                            println!("  {}. List all projects", i + 1);
-                        }
-                        OrchestrationAction::ListTasks { project } => {
-                            println!("  {}. List tasks{}", i + 1,
-                                project.as_ref().map(|p| format!(" for '{}'", p)).unwrap_or_default());
-                        }
-                        OrchestrationAction::GetStatus { project } => {
-                            println!("  {}. Get status of '{}'", i + 1, project);
-                        }
-                        OrchestrationAction::Chat { response } => {
-                            println!("  {}. 💬 {}", i + 1, response);
-                        }
-                    }
-                }
+            println!("🔄 Starting Autonomous Agent Loop: '{}'", workflow);
 
-                if dry_run {
-                    println!("\n⚠️  Dry run mode - no actions executed");
-                } else {
-                    println!("\n🚀 Executing actions...");
-                    for action in actions {
-                        match action {
-                            OrchestrationAction::CreateProject { name, .. } => {
-                                match project_service.create_project(&name, &agent_id).await {
-                                    Ok(p) => println!("  ✅ Created project: {}", p.name),
-                                    Err(e) => println!("  ❌ Failed to create project: {}", e),
-                                }
-                            }
-                            OrchestrationAction::CreateTask { project, description } => {
-                                match task_service.create_task(&project, &description, &agent_id).await {
-                                    Ok(t) => println!("  ✅ Created task: {}", t.description),
-                                    Err(e) => println!("  ❌ Failed to create task: {}", e),
-                                }
-                            }
-                            OrchestrationAction::RunTask { task_id } => {
-                                match task_service.run_task(&task_id, &agent_id).await {
-                                    Ok(r) => println!("  ✅ Task completed: {:?}", r.status),
-                                    Err(e) => println!("  ❌ Failed to run task: {}", e),
-                                }
-                            }
-                            OrchestrationAction::ListProjects => {
-                                let projects = project_service.list_projects().await?;
-                                println!("  📋 {} projects found", projects.len());
-                            }
-                            OrchestrationAction::ListTasks { project } => {
-                                let tasks = task_service.list_tasks(project.as_deref()).await?;
-                                println!("  📋 {} tasks found", tasks.len());
-                            }
-                            OrchestrationAction::GetStatus { project } => {
-                                match project_service.get_status(&project).await {
-                                    Ok(s) => println!("  📊 {}: {}% complete", s.name, s.progress_percent),
-                                    Err(e) => println!("  ❌ Failed to get status: {}", e),
-                                }
-                            }
-                            OrchestrationAction::Chat { response } => {
-                                println!("  💬 {}", response);
-                            }
-                        }
-                    }
-                    println!("\n✅ Orchestration complete!");
-                }
+            match runtime.run_loop(&workflow).await {
+                Ok(_) => println!("\n✅ Autonomous Goal Completed."),
+                Err(e) => println!("\n❌ Agent Error: {:?}", e),
             }
+        }
+
+        Some(Commands::Server { port }) => {
+            // Initialize cognition service
+            let cognition = init_cognition(&db, &timeline_service, &settings.cognition).await?;
+
+            // Initialize Agent Runtime
+            let runtime = AgentRuntime::new(
+                agent_id.clone(),
+                cognition,
+                project_service.clone(),
+                task_service.clone(),
+                watch_service.clone(),
+                agent_service.clone(),
+            );
+
+            start_server(runtime, timeline_service.clone(), agent_service.clone(), project_service.clone(), task_service.clone(), port).await?;
+        }
+
+        Some(Commands::Login {}) => {
+            let auth = AuthService::new()?;
+
+            // Check if we already have a valid token
+            if auth.get_valid_token().await.is_ok() {
+                println!("✅ Already logged in (valid credential found).");
+                println!("💡 To force re-login, delete ~/.gestalt/gemini_credentials.json manually.");
+                return Ok(());
+            }
+
+            println!("🔑 Starting Google Gemini OAuth2 login...");
+            match auth.login().await {
+                Ok(creds) => println!("✅ Login successful! Token expires at: {:?}", creds.expires_at),
+                Err(e) => println!("❌ Login failed: {:?}", e),
+            }
+        }
+
+        Some(Commands::Chat {}) => {
+             // Initialize cognition service
+            let cognition = init_cognition(&db, &timeline_service, &settings.cognition).await?;
+
+            // Run REPL
+            repl::run_repl(&agent_id, cognition).await?;
+        }
+
+        None => {
+             // No command provided. If prompt is also None (checked above), show help or REPL
+             // But we handled prompt above. So if we are here, prompt was None and command was None.
+             // Start REPL in that case.
+
+             // Initialize cognition service
+            let cognition = init_cognition(&db, &timeline_service, &settings.cognition).await?;
+
+            // Run REPL
+            repl::run_repl(&agent_id, cognition).await?;
         }
     }
 
@@ -353,4 +483,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-

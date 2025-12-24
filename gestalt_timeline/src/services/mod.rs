@@ -1,6 +1,8 @@
 //! Services module
 
 mod agent;
+mod auth;
+mod gemini;
 mod llm;
 mod project;
 mod task;
@@ -8,8 +10,14 @@ mod timeline;
 mod watch;
 
 pub use agent::{Agent, AgentService, AgentStatus, AgentType};
-pub use llm::{LLMResponse, LLMService, OrchestrationAction};
+pub use auth::AuthService;
+pub use gemini::GeminiService;
+pub use llm::{Cognition, LLMResponse, LLMService, OrchestrationAction};
 pub use project::ProjectService;
 pub use task::TaskService;
 pub use timeline::TimelineService;
 pub use watch::WatchService;
+pub mod runtime;
+pub use runtime::AgentRuntime;
+pub mod server;
+pub use server::start_server;

@@ -11,8 +11,16 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
 
+    /// Enable Context Engine (default: true)
+    #[arg(long, global = true, default_value_t = true)]
+    pub context: bool,
+
+    /// The prompt to send to the agents (when not using subcommands)
+    #[arg(short, long)]
+    pub prompt: Option<String>,
+
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 /// Available commands
@@ -25,6 +33,13 @@ pub enum Commands {
         name: String,
     },
 
+    /// Delete a project
+    #[command(name = "delete-project")]
+    DeleteProject {
+        /// ID of the project to delete
+        id: String,
+    },
+
     /// Add a task to a project
     #[command(name = "add-task")]
     AddTask {
@@ -32,6 +47,35 @@ pub enum Commands {
         project: String,
         /// Task description
         description: String,
+    },
+
+    /// Update a task
+    #[command(name = "update-task")]
+    UpdateTask {
+        /// Task ID
+        id: String,
+        /// New description
+        #[arg(long)]
+        description: Option<String>,
+        /// New status (Todo, InProgress, Completed, Cancelled)
+        #[arg(long)]
+        status: Option<String>,
+    },
+
+    /// Delete a task
+    #[command(name = "delete-task")]
+    DeleteTask {
+        /// ID of the task to delete
+        id: String,
+    },
+
+    /// Schedule a task for execution
+    #[command(name = "schedule-task")]
+    ScheduleTask {
+        /// Task ID
+        id: String,
+        /// Execution time (ISO 8601 or duration like "1h")
+        time: String,
     },
 
     /// Execute a task asynchronously
@@ -138,4 +182,19 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Start the Agent REST API server
+    #[command(name = "server")]
+    Server {
+        /// Port to listen on
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
+    },
+
+    /// Authenticate with Google Gemini via OAuth2
+    #[command(name = "login")]
+    Login,
+
+    /// Start an interactive chat session
+    #[command(name = "chat")]
+    Chat,
 }

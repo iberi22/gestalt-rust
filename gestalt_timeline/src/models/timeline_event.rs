@@ -2,10 +2,12 @@
 //!
 //! The timestamp is the PRIMARY variable of the entire system.
 
-use chrono::{DateTime, Utc};
+use super::FlexibleTimestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
+
+use surrealdb::sql::Thing;
 
 /// Represents an event in the universal timeline.
 ///
@@ -14,10 +16,12 @@ use std::fmt;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimelineEvent {
     /// Unique identifier (ULID format)
-    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Thing>,
 
     /// UTC timestamp - PRIMARY VARIABLE
-    pub timestamp: DateTime<Utc>,
+    #[serde(with = "super::timestamp")]
+    pub timestamp: FlexibleTimestamp,
 
     /// ID of the agent that triggered this event
     pub agent_id: String,
@@ -46,8 +50,8 @@ impl TimelineEvent {
     /// Create a new timeline event with current UTC timestamp.
     pub fn new(agent_id: &str, event_type: EventType) -> Self {
         Self {
-            id: ulid::Ulid::new().to_string(),
-            timestamp: Utc::now(),
+            id: None,
+            timestamp: FlexibleTimestamp::now(),
             agent_id: agent_id.to_string(),
             event_type,
             project_id: None,
@@ -99,6 +103,10 @@ pub enum EventType {
     TaskCompleted,
     /// A task failed
     TaskFailed,
+    /// A task was updated
+    TaskUpdated,
+    /// A task was deleted
+    TaskDeleted,
     /// An agent connected to the system
     AgentConnected,
     /// An agent disconnected from the system
@@ -132,6 +140,8 @@ impl<'de> Deserialize<'de> for EventType {
             "task_started" => Ok(EventType::TaskStarted),
             "task_completed" => Ok(EventType::TaskCompleted),
             "task_failed" => Ok(EventType::TaskFailed),
+            "task_updated" => Ok(EventType::TaskUpdated),
+            "task_deleted" => Ok(EventType::TaskDeleted),
             "agent_connected" => Ok(EventType::AgentConnected),
             "agent_disconnected" => Ok(EventType::AgentDisconnected),
             "command_executed" => Ok(EventType::CommandExecuted),
@@ -156,6 +166,8 @@ impl fmt::Display for EventType {
             EventType::TaskStarted => write!(f, "task_started"),
             EventType::TaskCompleted => write!(f, "task_completed"),
             EventType::TaskFailed => write!(f, "task_failed"),
+            EventType::TaskUpdated => write!(f, "task_updated"),
+            EventType::TaskDeleted => write!(f, "task_deleted"),
             EventType::AgentConnected => write!(f, "agent_connected"),
             EventType::AgentDisconnected => write!(f, "agent_disconnected"),
             EventType::CommandExecuted => write!(f, "command_executed"),

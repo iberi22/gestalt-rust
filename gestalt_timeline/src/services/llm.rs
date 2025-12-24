@@ -10,9 +10,17 @@ use tracing::{debug, info};
 
 use crate::db::SurrealClient;
 use crate::models::{EventType, Project, Task};
-use crate::services::TimelineService;
+use crate::services::{Agent, TimelineService};
 
 
+
+#[async_trait::async_trait]
+pub trait Cognition: Send + Sync {
+    async fn chat(&self, agent_id: &str, message: &str) -> Result<LLMResponse>;
+    async fn orchestrate(&self, agent_id: &str, workflow_description: &str, project_context: Option<&str>) -> Result<Vec<OrchestrationAction>>;
+    async fn orchestrate_step(&self, agent_id: &str, goal: &str, history: &[String], project_context: Option<&str>) -> Result<Vec<OrchestrationAction>>;
+    fn model_id(&self) -> &str;
+}
 
 /// LLM Service for AI-powered orchestration.
 #[derive(Clone)]
@@ -21,6 +29,25 @@ pub struct LLMService {
     db: SurrealClient,
     timeline: TimelineService,
     model_id: String,
+}
+
+#[async_trait::async_trait]
+impl Cognition for LLMService {
+    async fn chat(&self, agent_id: &str, message: &str) -> Result<LLMResponse> {
+        self.chat(agent_id, message).await
+    }
+
+    async fn orchestrate(&self, agent_id: &str, workflow_description: &str, project_context: Option<&str>) -> Result<Vec<OrchestrationAction>> {
+        self.orchestrate(agent_id, workflow_description, project_context).await
+    }
+
+    async fn orchestrate_step(&self, agent_id: &str, goal: &str, history: &[String], project_context: Option<&str>) -> Result<Vec<OrchestrationAction>> {
+        self.orchestrate_step(agent_id, goal, history, project_context).await
+    }
+
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
 }
 
 /// Response from the LLM
@@ -43,6 +70,13 @@ pub enum OrchestrationAction {
     ListTasks { project: Option<String> },
     GetStatus { project: String },
     Chat { response: String },
+    ReadFile { path: String },
+    WriteFile { path: String, content: String },
+    ExecuteShell { command: String },
+    StartJob { name: String, command: String },
+    StopJob { name: String },
+    ListJobs,
+    DelegateTask { agent: String, goal: String },
 }
 
 impl LLMService {
@@ -156,8 +190,13 @@ impl LLMService {
     ) -> Result<Vec<OrchestrationAction>> {
         info!("🎯 Orchestrating workflow: {}", workflow_description);
 
+        // Fetch agent persona if available
+        let agent: Option<Agent> = self.db.select_by_id("agents", agent_id).await.unwrap_or(None);
+        let agent_prompt = agent.as_ref().and_then(|a| a.system_prompt.as_deref());
+        let dynamic_model_id = agent.as_ref().and_then(|a| a.model_id.as_deref()).unwrap_or(&self.model_id);
+
         // Build combined prompt with context and request
-        let system_prompt = self.build_orchestration_prompt(project_context).await?;
+        let system_prompt = self.build_orchestration_prompt(project_context, agent_prompt).await?;
         let combined_message = format!("{}\n\nUSER REQUEST:\n{}", system_prompt, workflow_description);
 
         // Build single user message
@@ -167,11 +206,13 @@ impl LLMService {
             .build()
             .context("Failed to build message")?;
 
+        info!("🧠 Using model: {} (Agent Persona: {})", dynamic_model_id, agent_prompt.is_some());
+
         // Call Bedrock with single message
         let response = self
             .bedrock_client
             .converse()
-            .model_id(&self.model_id)
+            .model_id(dynamic_model_id)
             .messages(user_message)
             .send()
             .await
@@ -207,8 +248,81 @@ impl LLMService {
         Ok(actions)
     }
 
+    /// Execute a single step of the autonomous loop with history.
+    pub async fn orchestrate_step(
+        &self,
+        agent_id: &str,
+        goal: &str,
+        history: &[String],
+        project_context: Option<&str>,
+    ) -> Result<Vec<OrchestrationAction>> {
+        info!("🧠 Autonomous Step for Goal: {}", goal);
+
+        // Fetch agent persona if available
+        let agent: Option<Agent> = self.db.select_by_id("agents", agent_id).await.unwrap_or(None);
+        let agent_prompt = agent.as_ref().and_then(|a| a.system_prompt.as_deref());
+        let dynamic_model_id = agent.as_ref().and_then(|a| a.model_id.as_deref()).unwrap_or(&self.model_id);
+
+        // Build System Context
+        let system_context = self.build_orchestration_prompt(project_context, agent_prompt).await?;
+
+        // Format History
+        let history_text = if history.is_empty() {
+            "(No history)".to_string()
+        } else {
+            history.join("\n")
+        };
+
+        // Combine into one prompt (Simulating "Context Window")
+        let combined_msg = format!(
+            "{}\n\nGOAL: {}\n\nHISTORY OF ACTIONS:\n{}\n\nINSTRUCTION: Review the history. If the goal is met, return empty list []. Otherwise, return the next JSON actions.",
+            system_context, goal, history_text
+        );
+
+        // Build single user message
+        let user_message = Message::builder()
+            .role(ConversationRole::User)
+            .content(ContentBlock::Text(combined_msg))
+            .build()
+            .context("Failed to build message")?;
+
+        info!("🧠 Using model: {} (Step)", dynamic_model_id);
+
+        // Call Bedrock
+        let response = self
+            .bedrock_client
+            .converse()
+            .model_id(dynamic_model_id)
+            .messages(user_message)
+            .send()
+            .await
+            .context("Failed to invoke Bedrock model")?;
+
+        // Extract and parse response
+        let output = response.output().context("No output in response")?;
+        let content = match output {
+            aws_sdk_bedrockruntime::types::ConverseOutput::Message(msg) => {
+                msg.content()
+                    .iter()
+                    .filter_map(|block| {
+                        if let ContentBlock::Text(text) = block {
+                            Some(text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("")
+            }
+            _ => String::new(),
+        };
+
+        // Parse actions from response
+        self.parse_orchestration_response(&content)
+    }
+
     /// Build the orchestration system prompt with current context.
-    async fn build_orchestration_prompt(&self, project_context: Option<&str>) -> Result<String> {
+    async fn build_orchestration_prompt(&self, project_context: Option<&str>, agent_prompt: Option<&str>) -> Result<String> {
         // Get current projects and tasks for context
         let projects: Vec<Project> = self.db.select_all("projects").await.unwrap_or_default();
         let tasks: Vec<Task> = self.db.select_all("tasks").await.unwrap_or_default();
@@ -232,8 +346,10 @@ impl LLMService {
             String::new()
         };
 
+        let base_prompt = agent_prompt.unwrap_or("You are a workflow orchestrator for Gestalt Timeline, a project and task management system.");
+
         Ok(format!(
-            r#"You are a workflow orchestrator for Gestalt Timeline, a project and task management system.
+            r#"{}
 
 CURRENT STATE:
 Projects:
@@ -250,10 +366,17 @@ You can perform these actions by responding with JSON:
 4. List projects: {{"action": "list_projects"}}
 5. List tasks: {{"action": "list_tasks", "project": "optional-project-name"}}
 6. Get status: {{"action": "get_status", "project": "project-name"}}
-
+7. Read file: {{"action": "read_file", "path": "path/to/file"}}
+8. Write file: {{"action": "write_file", "path": "path/to/file", "content": "file content"}}
+11. Execute shell command: {{"action": "execute_shell", "command": "ls -la"}} (WARNING: Executes on host machine)
+12. Start background job: {{"action": "start_job", "name": "server", "command": "python3 -m http.server 8080"}}
+13. Stop background job: {{"action": "stop_job", "name": "server"}}
+14. List background jobs: {{"action": "list_jobs"}}
+15. Delegate task to another agent: {{"action": "delegate_task", "agent": "<developer|researcher|reviewer>", "goal": "<goal>"}}
 Respond with a JSON array of actions to execute, or a single {{"action": "chat", "response": "your message"}} for conversational responses.
 
-Example: [{{"action": "create_project", "name": "my-app"}}, {{"action": "create_task", "project": "my-app", "description": "Setup database"}}]"#,
+Example: [{{"action": "create_project", "name": "my-app"}}, {{"action": "execute_shell", "command": "git init"}}]"#,
+            base_prompt,
             if project_list.is_empty() { "(none)" } else { &project_list },
             if task_list.is_empty() { "(none)" } else { &task_list },
             context_section
@@ -307,6 +430,28 @@ Example: [{{"action": "create_project", "name": "my-app"}}, {{"action": "create_
                 },
                 "get_status" => OrchestrationAction::GetStatus {
                     project: raw.get("project").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                },
+                "read_file" => OrchestrationAction::ReadFile {
+                    path: raw.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                },
+                "write_file" => OrchestrationAction::WriteFile {
+                    path: raw.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    content: raw.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                },
+                "execute_shell" => OrchestrationAction::ExecuteShell {
+                    command: raw.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                },
+                "start_job" => OrchestrationAction::StartJob {
+                    name: raw.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                    command: raw.get("command").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                },
+                "stop_job" => OrchestrationAction::StopJob {
+                    name: raw.get("name").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                },
+                "list_jobs" => OrchestrationAction::ListJobs,
+                "delegate_task" => OrchestrationAction::DelegateTask {
+                    agent: raw.get("agent").and_then(|v| v.as_str()).unwrap_or("general").to_string(),
+                    goal: raw.get("goal").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 },
                 _ => OrchestrationAction::Chat {
                     response: raw.get("response").and_then(|v| v.as_str()).unwrap_or(response).to_string(),
@@ -404,6 +549,38 @@ mod tests {
             assert_eq!(description, "t1");
         } else {
             panic!("Expected CreateTask");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_parse_orchestration_response_new_actions() {
+        let llm = setup_llm().await;
+        let response = r#"[
+            {"action": "read_file", "path": "test.txt"},
+            {"action": "write_file", "path": "out.txt", "content": "hello"},
+            {"action": "execute_shell", "command": "echo hi"}
+        ]"#;
+        let actions = llm.parse_orchestration_response(response).unwrap();
+
+        assert_eq!(actions.len(), 3);
+
+        if let OrchestrationAction::ReadFile { path } = &actions[0] {
+            assert_eq!(path, "test.txt");
+        } else {
+            panic!("Expected ReadFile");
+        }
+
+        if let OrchestrationAction::WriteFile { path, content } = &actions[1] {
+            assert_eq!(path, "out.txt");
+            assert_eq!(content, "hello");
+        } else {
+            panic!("Expected WriteFile");
+        }
+
+        if let OrchestrationAction::ExecuteShell { command } = &actions[2] {
+            assert_eq!(command, "echo hi");
+        } else {
+            panic!("Expected ExecuteShell");
         }
     }
 }

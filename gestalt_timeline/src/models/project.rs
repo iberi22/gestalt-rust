@@ -1,6 +1,4 @@
-//! Project model
-
-use chrono::{DateTime, Utc};
+use super::FlexibleTimestamp;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use surrealdb::sql::Thing;
@@ -21,10 +19,12 @@ pub struct Project {
     pub priority: u8,
 
     /// Creation timestamp
-    pub created_at: DateTime<Utc>,
+    #[serde(with = "super::timestamp")]
+    pub created_at: FlexibleTimestamp,
 
     /// Last update timestamp
-    pub updated_at: DateTime<Utc>,
+    #[serde(with = "super::timestamp")]
+    pub updated_at: FlexibleTimestamp,
 
     /// Agent that created the project
     pub created_by: String,
@@ -33,13 +33,13 @@ pub struct Project {
 impl Project {
     /// Create a new project with default values.
     pub fn new(name: &str, created_by: &str) -> Self {
-        let now = Utc::now();
+        let now = FlexibleTimestamp::now();
         Self {
             id: None, // Let DB or Builder handle ID, or we can set it if we want custom ULID
             name: name.to_string(),
             status: ProjectStatus::Active,
             priority: 5,
-            created_at: now,
+            created_at: now.clone(),
             updated_at: now,
             created_by: created_by.to_string(),
         }

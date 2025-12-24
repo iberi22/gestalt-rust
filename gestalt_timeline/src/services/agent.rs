@@ -3,12 +3,13 @@
 //! Manages connected agents and their sessions in the timeline system.
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
 use crate::db::SurrealClient;
 use crate::models::EventType;
+use crate::models::FlexibleTimestamp;
 use crate::services::TimelineService;
 
 /// Represents a connected agent in the system.
@@ -27,13 +28,23 @@ pub struct Agent {
     pub status: AgentStatus,
 
     /// When the agent connected
-    pub connected_at: DateTime<Utc>,
+    #[serde(with = "crate::models::timestamp")]
+    pub connected_at: FlexibleTimestamp,
 
     /// Last activity timestamp
-    pub last_seen: DateTime<Utc>,
+    #[serde(with = "crate::models::timestamp")]
+    pub last_seen: FlexibleTimestamp,
 
     /// Number of commands executed
     pub command_count: u64,
+
+    /// Custom system prompt for this agent (Persona)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_prompt: Option<String>,
+
+    /// Specific model ID (e.g., "anthropic.claude-3-sonnet-20240229-v1:0")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
 
     /// Optional metadata
     #[serde(default)]
@@ -87,15 +98,17 @@ impl std::fmt::Display for AgentStatus {
 impl Agent {
     /// Create a new agent.
     pub fn new(id: &str, name: &str, agent_type: AgentType) -> Self {
-        let now = Utc::now();
+        let now = FlexibleTimestamp::now();
         Self {
             id: id.to_string(),
             name: name.to_string(),
             agent_type,
             status: AgentStatus::Online,
-            connected_at: now,
+            connected_at: now.clone(),
             last_seen: now,
             command_count: 0,
+            system_prompt: None,
+            model_id: None,
             metadata: std::collections::HashMap::new(),
         }
     }
@@ -141,7 +154,7 @@ impl AgentService {
         if let Some(mut existing) = self.get_agent(agent_id).await? {
             // Update existing agent
             existing.status = AgentStatus::Online;
-            existing.last_seen = Utc::now();
+            existing.last_seen = FlexibleTimestamp::now();
             let updated = self.db.update("agents", agent_id, &existing).await?;
 
             self.timeline
@@ -168,7 +181,7 @@ impl AgentService {
 
         if let Some(mut agent) = self.get_agent(agent_id).await? {
             agent.status = AgentStatus::Offline;
-            agent.last_seen = Utc::now();
+            agent.last_seen = FlexibleTimestamp::now();
 
             let updated = self.db.update("agents", agent_id, &agent).await?;
 
@@ -195,7 +208,7 @@ impl AgentService {
     /// List only online agents.
     pub async fn list_online_agents(&self) -> Result<Vec<Agent>> {
         let query = "SELECT * FROM agents WHERE status = 'online' ORDER BY last_seen DESC";
-        self.db.query_with(query, ()).await
+        self.db.query_with::<Agent>(query, ()).await
     }
 
     /// Update agent's last seen timestamp.
@@ -203,7 +216,7 @@ impl AgentService {
         debug!("Heartbeat from agent: {}", agent_id);
 
         if let Some(mut agent) = self.get_agent(agent_id).await? {
-            agent.last_seen = Utc::now();
+            agent.last_seen = FlexibleTimestamp::now();
             agent.command_count += 1;
             self.db.update("agents", agent_id, &agent).await?;
         }
@@ -215,7 +228,7 @@ impl AgentService {
     pub async fn set_status(&self, agent_id: &str, status: AgentStatus) -> Result<Option<Agent>> {
         if let Some(mut agent) = self.get_agent(agent_id).await? {
             agent.status = status;
-            agent.last_seen = Utc::now();
+            agent.last_seen = FlexibleTimestamp::now();
             let updated = self.db.update("agents", agent_id, &agent).await?;
             return Ok(Some(updated));
         }

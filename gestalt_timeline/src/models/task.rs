@@ -1,16 +1,16 @@
-//! Task model
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use surrealdb::sql::Thing;
 
 /// Represents a task within a project.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
     /// Unique identifier
-    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Thing>,
 
-    /// Associated project ID
+    /// Project this task belongs to
     pub project_id: String,
 
     /// Task description
@@ -46,7 +46,7 @@ impl Task {
     pub fn new(project_id: &str, description: &str, created_by: &str) -> Self {
         let now = Utc::now();
         Self {
-            id: ulid::Ulid::new().to_string(),
+            id: None,
             project_id: project_id.to_string(),
             description: description.to_string(),
             status: TaskStatus::Pending,

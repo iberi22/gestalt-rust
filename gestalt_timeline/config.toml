@@ -1,13 +1,13 @@
 [database]
-url = "mem://"
+url = "file://gestalt.db"
 user = "root"
 pass = "root"
 namespace = "gestalt"
 database = "timeline"
 
 [cognition]
-# Default Claude Sonnet 4.5 model
-model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+# Default Claude Haiku model (faster, less throttling)
+model_id = "anthropic.claude-3-haiku-20240307-v1:0"
 
 [agent]
 id = "cli_default"

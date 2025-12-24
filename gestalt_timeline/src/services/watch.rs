@@ -90,6 +90,7 @@ impl WatchService {
             }
 
             // Query for new events since last check
+            // Note: In SurrealDB, string comparison works for ISO8601 timestamps
             let query = match project_filter {
                 Some(pid) => format!(
                     "SELECT * FROM timeline_events WHERE timestamp > $since AND project_id = '{}' ORDER BY timestamp ASC",
@@ -105,6 +106,9 @@ impl WatchService {
                 .unwrap_or_default();
 
             for event in events {
+                // Use the inner DateTime<Utc> for comparison and updating last_check
+                let ts_utc = event.timestamp.0;
+
                 // Apply event type filter if specified
                 if let Some(ref filters) = event_filter {
                     let event_str = event.event_type.to_string();
@@ -116,16 +120,19 @@ impl WatchService {
                 // Print event to console
                 println!(
                     "{} │ {:15} │ {:20} │ {}",
-                    event.timestamp.format("%H:%M:%S"),
+                    ts_utc.format("%H:%M:%S"),
                     event.agent_id,
                     event.event_type,
-                    event.id
+                    event.id.as_ref().map(|x| x.to_string()).unwrap_or_else(|| "none".to_string())
                 );
+
+                // Update last_check to strictly follow the latest event seen
+                if ts_utc > last_check {
+                    last_check = ts_utc;
+                }
 
                 // Broadcast to subscribers
                 let _ = self.tx.send(WatchMessage::Event(event.clone()));
-
-                last_check = event.timestamp;
             }
 
             tokio::time::sleep(poll_interval).await;

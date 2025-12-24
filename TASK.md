@@ -92,6 +92,22 @@ MVP completo. Todas las fases implementadas: CLI base, tiempo real, multi-agente
 
 ---
 
+## 🚀 Fase 5: Integración UI & API
+
+**Objetivo:** Exponer la funcionalidad mediante API HTTP y conectar con aplicación Flutter.
+
+| ID | Tarea | Prioridad | Estado | Responsable |
+|----|-------|-----------|--------|-------------|
+| F5-01 | Crear `AgentRuntime` loop autónomo | ALTA | ✅ Completado | Agent |
+| F5-02 | Implementar servidor HTTP (Axum) | ALTA | ✅ Completado | Agent |
+| F5-03 | API Endpoint `/orchestrate` | ALTA | ✅ Completado | Agent |
+| F5-04 | API Endpoint `/timeline` (polling) | ALTA | ✅ Completado | Agent |
+| F5-05 | Crear aplicación Flutter (`gestalt_app`) | MEDIA | ✅ Completado | Agent |
+| F5-06 | Implementar vista de chat en Flutter | MEDIA | ✅ Completado | Agent |
+| F5-07 | Test E2E de Runtime (Mocked) | ALTA | ✅ Completado | Agent |
+
+---
+
 ## ✅ Hitos Principales
 
 - [x] **Hito 1:** Documentación inicial completada

@@ -52,7 +52,7 @@ impl SurrealClient {
         db.query(
             r#"
             DEFINE TABLE timeline_events SCHEMAFULL;
-            DEFINE FIELD timestamp ON timeline_events TYPE string;
+            DEFINE FIELD timestamp ON timeline_events TYPE any;
             DEFINE FIELD agent_id ON timeline_events TYPE string;
             DEFINE FIELD event_type ON timeline_events TYPE string;
             DEFINE FIELD project_id ON timeline_events TYPE option<string>;
@@ -67,8 +67,8 @@ impl SurrealClient {
             DEFINE FIELD name ON projects TYPE string;
             DEFINE FIELD status ON projects TYPE string;
             DEFINE FIELD priority ON projects TYPE int;
-            DEFINE FIELD created_at ON projects TYPE string;
-            DEFINE FIELD updated_at ON projects TYPE string;
+            DEFINE FIELD created_at ON projects TYPE any;
+            DEFINE FIELD updated_at ON projects TYPE any;
             DEFINE FIELD created_by ON projects TYPE string;
             DEFINE INDEX idx_name ON projects FIELDS name UNIQUE;
 
@@ -76,14 +76,24 @@ impl SurrealClient {
             DEFINE FIELD project_id ON tasks TYPE string;
             DEFINE FIELD description ON tasks TYPE string;
             DEFINE FIELD status ON tasks TYPE string;
-            DEFINE FIELD created_at ON tasks TYPE string;
-            DEFINE FIELD updated_at ON tasks TYPE string;
-            DEFINE FIELD completed_at ON tasks TYPE option<string>;
+            DEFINE FIELD created_at ON tasks TYPE any;
+            DEFINE FIELD updated_at ON tasks TYPE any;
+            DEFINE FIELD completed_at ON tasks TYPE any;
             DEFINE FIELD created_by ON tasks TYPE string;
             DEFINE FIELD executed_by ON tasks TYPE option<string>;
             DEFINE FIELD duration_ms ON tasks TYPE option<int>;
             DEFINE INDEX idx_project_id ON tasks FIELDS project_id;
             DEFINE INDEX idx_status ON tasks FIELDS status;
+
+            DEFINE TABLE agents SCHEMAFULL;
+            DEFINE FIELD name ON agents TYPE string;
+            DEFINE FIELD agent_type ON agents TYPE string;
+            DEFINE FIELD status ON agents TYPE string;
+            DEFINE FIELD connected_at ON agents TYPE datetime;
+            DEFINE FIELD last_seen ON agents TYPE datetime;
+            DEFINE FIELD command_count ON agents TYPE int;
+            DEFINE FIELD system_prompt ON agents TYPE option<string>;
+            DEFINE FIELD model_id ON agents TYPE option<string>;
             "#,
         )
         .await
@@ -132,5 +142,10 @@ impl SurrealClient {
         let mut response = self.db.query(query).bind(bindings).await?;
         let results: Vec<T> = response.take(0)?;
         Ok(results)
+    }
+    /// Delete a record.
+    pub async fn delete(&self, table: &str, id: &str) -> Result<()> {
+        let _: Option<serde_json::Value> = self.db.delete((table, id)).await?;
+        Ok(())
     }
 }

@@ -21,6 +21,7 @@ pub struct DatabaseSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CognitionSettings {
     pub model_id: String,
+    pub gemini_api_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

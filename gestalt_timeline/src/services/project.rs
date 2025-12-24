@@ -5,7 +5,7 @@ use surrealdb::sql::Thing;
 use tracing::debug;
 
 use crate::db::SurrealClient;
-use crate::models::{EventType, Project, ProjectStatus, ProjectStatusInfo, Task};
+use crate::models::{EventType, Project, ProjectStatus, ProjectStatusInfo, Task, FlexibleTimestamp};
 use crate::services::TimelineService;
 
 /// Helper to convert Option<Thing> to String
@@ -108,7 +108,7 @@ impl ProjectService {
             .context("Project not found")?;
 
         project.status = status;
-        project.updated_at = chrono::Utc::now();
+        project.updated_at = FlexibleTimestamp::now();
 
         let updated = self.db.update("projects", project_id, &project).await?;
 
@@ -117,5 +117,24 @@ impl ProjectService {
             .await?;
 
         Ok(updated)
+    }
+
+    /// Delete a project and its tasks.
+    pub async fn delete_project(&self, project_id: &str, agent_id: &str) -> Result<()> {
+        debug!("Deleting project: {}", project_id);
+
+        // Delete tasks first
+        let query = "DELETE FROM tasks WHERE project_id = $project_id";
+        self.db.query_with::<serde_json::Value>(query, ("project_id", project_id)).await?;
+
+        // Delete project
+        self.db.delete("projects", project_id).await?;
+
+        // Emit event
+        self.timeline
+            .emit_project_event(agent_id, EventType::ProjectDeleted, project_id)
+            .await?;
+
+        Ok(())
     }
 }

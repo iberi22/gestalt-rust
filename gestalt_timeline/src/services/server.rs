@@ -1,0 +1,268 @@
+use axum::{
+    extract::{State, Json, Path},
+    routing::{get, post, put, delete}, // Added put, delete
+    Router,
+    http::StatusCode,
+};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::net::TcpListener;
+use tower_http::cors::CorsLayer;
+use tracing::info;
+use chrono::{DateTime, Utc};
+
+use crate::services::{AgentRuntime, TimelineService, AgentService, ProjectService, TaskService};
+use crate::models::{TaskStatus}; // Import TaskStatus
+
+#[derive(Clone)]
+pub struct AppState {
+    pub runtime: AgentRuntime,
+    pub timeline: TimelineService,
+    pub agent: AgentService,
+    pub project: ProjectService,
+    pub task: TaskService,
+}
+
+#[derive(Deserialize)]
+pub struct OrchestrateRequest {
+    pub goal: String,
+}
+
+#[derive(Serialize)]
+pub struct OrchestrateResponse {
+    pub message: String,
+    pub task_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateProjectRequest {
+    pub name: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateTaskRequest {
+    pub project: String,
+    pub description: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateTaskRequest {
+    pub description: Option<String>,
+    pub status: Option<String>, // "todo", "running", "completed", "cancelled"
+}
+
+#[derive(Deserialize)]
+pub struct ScheduleTaskRequest {
+    pub time: DateTime<Utc>,
+}
+
+/// Start the Agent REST API server.
+pub async fn start_server(
+    runtime: AgentRuntime,
+    timeline: TimelineService,
+    agent: AgentService,
+    project: ProjectService,
+    task: TaskService,
+    port: u16,
+) -> anyhow::Result<()> {
+    let state = AppState {
+        runtime,
+        timeline,
+        agent,
+        project,
+        task,
+    };
+
+    let app = Router::new()
+        .route("/orchestrate", post(run_orchestration))
+        .route("/timeline", get(get_timeline))
+        .route("/agents", get(get_agents))
+        .route("/projects", get(get_projects).post(create_project))
+        .route("/projects/:id", delete(delete_project))
+        .route("/tasks", get(get_tasks).post(create_task))
+        .route("/tasks/:id", put(update_task).delete(delete_task))
+        .route("/tasks/:id/run", post(run_task_endpoint))
+        .route("/tasks/:id/schedule", post(schedule_task_endpoint))
+        .layer(CorsLayer::permissive()) // Allow Flutter app to access
+        .with_state(state);
+
+    let addr = format!("0.0.0.0:{}", port);
+    info!("🚀 Agent Server listening on {}", addr);
+
+    let listener = TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}
+
+/// Handler: Trigger autonomous loop
+async fn run_orchestration(
+    State(state): State<AppState>,
+    Json(payload): Json<OrchestrateRequest>,
+) -> (StatusCode, Json<OrchestrateResponse>) {
+    info!("📥 Received orchestration request: {}", payload.goal);
+
+    let runtime = state.runtime.clone();
+    let goal = payload.goal.clone();
+
+    // Spawn background task
+    tokio::spawn(async move {
+        match runtime.run_loop(&goal).await {
+            Ok(_) => info!("✅ Background orchestration completed for: {}", goal),
+            Err(e) => info!("❌ Background orchestration failed: {}", e),
+        }
+    });
+
+    (
+        StatusCode::ACCEPTED,
+        Json(OrchestrateResponse {
+            message: "Orchestration started".to_string(),
+            task_id: "background-task".to_string(), // TODO: meaningful ID
+        }),
+    )
+}
+
+/// Handler: Get timeline events (pollable)
+async fn get_timeline(
+    State(state): State<AppState>,
+) -> Json<Vec<crate::models::TimelineEvent>> {
+    let events = state.timeline.get_timeline(None).await.unwrap_or_default();
+    Json(events)
+}
+
+/// Handler: Get agents status
+async fn get_agents(
+    State(state): State<AppState>,
+) -> Json<Vec<crate::services::Agent>> {
+    let agents = state.agent.list_agents().await.unwrap_or_default();
+    Json(agents)
+}
+
+/// Handler: Get all projects
+async fn get_projects(
+    State(state): State<AppState>,
+) -> Json<Vec<crate::models::Project>> {
+    let projects = state.project.list_projects().await.unwrap_or_default();
+    Json(projects)
+}
+
+/// Handler: Create project
+async fn create_project(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateProjectRequest>,
+) -> (StatusCode, Json<Option<crate::models::Project>>) {
+    // Hardcoded agent ID for now since we lack auth middleware on API
+    match state.project.create_project(&payload.name, "system-api").await {
+        Ok(project) => (StatusCode::CREATED, Json(Some(project))),
+        Err(e) => {
+            info!("Failed to create project: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(None))
+        }
+    }
+}
+
+/// Handler: Delete project
+async fn delete_project(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> StatusCode {
+    match state.project.delete_project(&id, "system-api").await {
+        Ok(_) => StatusCode::NO_CONTENT,
+        Err(e) => {
+            info!("Failed to delete project: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+/// Handler: Get all tasks (optionally filtered by project query param - simplified for now)
+async fn get_tasks(
+    State(state): State<AppState>,
+) -> Json<Vec<crate::models::Task>> {
+    // List all tasks by iterating projects (inefficient but works for MVP) or adding list_all to TaskService
+    // Assuming we added list_tasks(None) -> all tasks support in TaskService which we did!
+    match state.task.list_tasks(None).await {
+        Ok(tasks) => Json(tasks),
+        Err(_) => Json(vec![])
+    }
+}
+
+/// Handler: Create task
+async fn create_task(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateTaskRequest>,
+) -> (StatusCode, Json<Option<crate::models::Task>>) {
+    match state.task.create_task(&payload.project, &payload.description, "system-api").await {
+        Ok(task) => (StatusCode::CREATED, Json(Some(task))),
+        Err(e) => {
+            info!("Failed to create task: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(None))
+        }
+    }
+}
+
+/// Handler: Update task
+async fn update_task(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<UpdateTaskRequest>,
+) -> (StatusCode, Json<Option<crate::models::Task>>) {
+    let status = payload.status.and_then(|s| match s.to_lowercase().as_str() {
+        "todo" => Some(TaskStatus::Pending),
+        "running" | "inprogress" => Some(TaskStatus::Running),
+        "completed" | "done" => Some(TaskStatus::Completed),
+        "cancelled" | "failed" => Some(TaskStatus::Cancelled),
+        _ => None,
+    });
+
+    match state.task.update_task(&id, payload.description, status, "system-api").await {
+        Ok(task) => (StatusCode::OK, Json(Some(task))),
+        Err(e) => {
+            info!("Failed to update task: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(None))
+        }
+    }
+}
+
+/// Handler: Delete task
+async fn delete_task(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> StatusCode {
+    match state.task.delete_task(&id, "system-api").await {
+        Ok(_) => StatusCode::NO_CONTENT,
+        Err(e) => {
+            info!("Failed to delete task: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+/// Handler: Run task
+async fn run_task_endpoint(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> StatusCode {
+    match state.task.run_task(&id, "system-api").await {
+        Ok(_) => StatusCode::OK,
+        Err(e) => {
+             info!("Failed to run task: {}", e);
+             StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+/// Handler: Schedule task
+async fn schedule_task_endpoint(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(payload): Json<ScheduleTaskRequest>,
+) -> StatusCode {
+    match state.task.schedule_task(&id, payload.time, "system-api").await {
+        Ok(_) => StatusCode::OK,
+        Err(e) => {
+             info!("Failed to schedule task: {}", e);
+             StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
