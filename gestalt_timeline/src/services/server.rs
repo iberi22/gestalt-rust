@@ -56,6 +56,11 @@ pub struct ScheduleTaskRequest {
     pub time: DateTime<Utc>,
 }
 
+#[derive(Deserialize)]
+pub struct SetModelRequest {
+    pub model_id: String,
+}
+
 /// Start the Agent REST API server.
 pub async fn start_server(
     runtime: AgentRuntime,
@@ -77,6 +82,8 @@ pub async fn start_server(
         .route("/orchestrate", post(run_orchestration))
         .route("/timeline", get(get_timeline))
         .route("/agents", get(get_agents))
+        .route("/models", get(get_models)) // NEW
+        .route("/config/model", post(set_active_model)) // NEW
         .route("/projects", get(get_projects).post(create_project))
         .route("/projects/:id", delete(delete_project))
         .route("/tasks", get(get_tasks).post(create_task))
@@ -263,6 +270,33 @@ async fn schedule_task_endpoint(
         Err(e) => {
              info!("Failed to schedule task: {}", e);
              StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+/// Handler: Get available models
+async fn get_models(
+    State(state): State<AppState>,
+) -> (StatusCode, Json<Vec<String>>) {
+    match state.runtime.list_models().await {
+        Ok(models) => (StatusCode::OK, Json(models)),
+        Err(e) => {
+            info!("Failed to list models: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(vec![]))
+        }
+    }
+}
+
+/// Handler: Set active model
+async fn set_active_model(
+    State(state): State<AppState>,
+    Json(payload): Json<SetModelRequest>,
+) -> StatusCode {
+    match state.runtime.set_model(&payload.model_id).await {
+        Ok(_) => StatusCode::OK,
+        Err(e) => {
+            info!("Failed to set model: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
         }
     }
 }

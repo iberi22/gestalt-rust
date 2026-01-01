@@ -89,10 +89,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               const Text("System Overview", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
               Row(
-                children: _agents.map((a) => Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: AgentStatusPill(agent: a),
-                )).toList(),
+                children: [
+                  ..._agents.map((a) => Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: AgentStatusPill(agent: a),
+                  )),
+                  IconButton(
+                    onPressed: () async {
+                      final ok = await _api.checkHealth();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(ok ? "System Online 🟢" : "System Offline 🔴")),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.monitor_heart, color: Colors.greenAccent),
+                    tooltip: "Health Check",
+                  ),
+                ],
               ),
             ],
           ),

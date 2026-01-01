@@ -22,6 +22,7 @@ pub struct AgentRuntime {
     jobs: Arc<Mutex<HashMap<String, tokio::process::Child>>>,
 }
 
+
 impl AgentRuntime {
     pub fn new(
         agent_id: String,
@@ -41,6 +42,14 @@ impl AgentRuntime {
             max_steps: 10, // Default safety limit
             jobs: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    pub async fn list_models(&self) -> Result<Vec<String>> {
+        self.llm.list_models().await
+    }
+
+    pub async fn set_model(&self, model_id: &str) -> Result<()> {
+        self.llm.set_model(model_id).await
     }
 
     /// Run the autonomous loop for a specific goal.
@@ -250,6 +259,54 @@ impl AgentRuntime {
                 match Box::pin(sub_future).await {
                     Ok(_) => Ok(format!("Delegated task to '{}' completed successfully.", agent)),
                     Err(e) => Ok(format!("Delegated task to '{}' failed: {}", agent, e)),
+                }
+            }
+
+            OrchestrationAction::CallAgent { tool, args } => {
+                info!("📞 Calling external agent/tool: {} {:?}", tool, args);
+
+                // Allow-list for security
+                let allowed_tools = vec!["gh", "aws", "kubectl", "cargo", "git", "docker"];
+                if !allowed_tools.contains(&tool.as_str()) {
+                    return Ok(format!("❌ Security Error: Tool '{}' is not in the allow-list.", tool));
+                }
+
+                #[cfg(target_os = "windows")]
+                let mut cmd = tokio::process::Command::new("powershell");
+                #[cfg(target_os = "windows")]
+                cmd.arg("-Command").arg(format!("{} {}", tool, args.join(" ")));
+
+                #[cfg(not(target_os = "windows"))]
+                let mut cmd = tokio::process::Command::new(&tool);
+                #[cfg(not(target_os = "windows"))]
+                cmd.args(args);
+
+                match cmd.output().await {
+                    Ok(output) => {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        let exit_code = output.status.code().unwrap_or(-1);
+                        Ok(format!(
+                            "Tool '{}' executed (Exit: {})\nSTDOUT:\n{}\nSTDERR:\n{}",
+                            tool, exit_code, stdout, stderr
+                        ))
+                    }
+                    Err(e) => Ok(format!("Failed to execute tool '{}': {}", tool, e)),
+                }
+            }
+            OrchestrationAction::AwaitJob { job_id } => {
+                info!("⏳ Awaiting job: {}", job_id);
+
+                let mut jobs = self.jobs.lock().await;
+                if let Some(mut child) = jobs.remove(job_id.as_str()) {
+                    drop(jobs);
+
+                    match child.wait().await {
+                        Ok(status) => Ok(format!("Job '{}' finished with status: {}", job_id, status)),
+                        Err(e) => Ok(format!("Error waiting for job '{}': {}", job_id, e)),
+                    }
+                } else {
+                    Ok(format!("Job '{}' not found or already finished.", job_id))
                 }
             }
         }

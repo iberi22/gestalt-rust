@@ -53,6 +53,7 @@ dotenvy = "0.15"
 # AWS Bedrock
 aws-config = "1.5"
 aws-sdk-bedrockruntime = "1.71"
+aws-sdk-bedrock = "1.71"
 
 # For streaming responses
 futures = "0.3"

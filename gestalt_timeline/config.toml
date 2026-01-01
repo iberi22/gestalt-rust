@@ -6,8 +6,8 @@ namespace = "gestalt"
 database = "timeline"
 
 [cognition]
-# Default Claude Haiku model (faster, less throttling)
-model_id = "anthropic.claude-3-haiku-20240307-v1:0"
+# Default model (Claude 3.5 Sonnet)
+model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
 [agent]
 id = "cli_default"

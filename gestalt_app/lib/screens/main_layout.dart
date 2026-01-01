@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
-import 'project_list_screen.dart'; // We'll create this next
-import '../widgets/agent_status_pill.dart'; // If needed in header
+import 'project_list_screen.dart';
+import 'settings_screen.dart';
+import '../widgets/agent_status_pill.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -15,9 +16,9 @@ class _MainLayoutState extends State<MainLayout> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
-    const ProjectListScreen(), // Placeholder for now
+    const ProjectListScreen(),
     const Center(child: Text("Agents View (Coming Soon)", style: TextStyle(color: Colors.white))),
-    const Center(child: Text("Settings View (Coming Soon)", style: TextStyle(color: Colors.white))),
+    const SettingsScreen(),
   ];
 
   @override

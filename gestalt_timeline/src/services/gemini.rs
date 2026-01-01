@@ -285,7 +285,15 @@ impl Cognition for GeminiService {
         Ok(actions)
     }
 
-    fn model_id(&self) -> &str {
-        &self.model_id
+    fn model_id(&self) -> String {
+        self.model_id.clone()
+    }
+
+    async fn list_models(&self) -> Result<Vec<String>> {
+        Ok(vec!["gemini-pro".to_string(), "gemini-1.5-pro".to_string()])
+    }
+
+    async fn set_model(&self, _model_id: &str) -> Result<()> {
+        Err(anyhow::anyhow!("Dynamic model selection not implemented for Gemini service"))
     }
 }

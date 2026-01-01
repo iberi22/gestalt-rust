@@ -151,4 +151,42 @@ class ApiService {
       return false;
     }
   }
+
+  Future<bool> checkHealth() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/health'));
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error checking health: $e');
+      return false;
+    }
+  }
+
+  Future<List<String>> getModels() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/models'));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data.cast<String>();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching models: $e');
+      return [];
+    }
+  }
+
+  Future<bool> setModel(String modelId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/config/model'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'model_id': modelId}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error setting model: $e');
+      return false;
+    }
+  }
 }

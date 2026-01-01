@@ -5,8 +5,10 @@
 use anyhow::{Context, Result};
 use aws_sdk_bedrockruntime::types::{ContentBlock, ConversationRole, Message};
 use aws_sdk_bedrockruntime::Client as BedrockClient;
+use aws_sdk_bedrock::Client as BedrockControlClient;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::{debug, info, error};
+use std::sync::{Arc, RwLock};
 
 use crate::db::SurrealClient;
 use crate::models::{EventType, Project, Task};
@@ -19,16 +21,19 @@ pub trait Cognition: Send + Sync {
     async fn chat(&self, agent_id: &str, message: &str) -> Result<LLMResponse>;
     async fn orchestrate(&self, agent_id: &str, workflow_description: &str, project_context: Option<&str>) -> Result<Vec<OrchestrationAction>>;
     async fn orchestrate_step(&self, agent_id: &str, goal: &str, history: &[String], project_context: Option<&str>) -> Result<Vec<OrchestrationAction>>;
-    fn model_id(&self) -> &str;
+    fn model_id(&self) -> String;
+    async fn list_models(&self) -> Result<Vec<String>>;
+    async fn set_model(&self, model_id: &str) -> Result<()>;
 }
 
 /// LLM Service for AI-powered orchestration.
 #[derive(Clone)]
 pub struct LLMService {
     bedrock_client: BedrockClient,
+    bedrock_control: BedrockControlClient,
     db: SurrealClient,
     timeline: TimelineService,
-    model_id: String,
+    model_id: Arc<RwLock<String>>,
 }
 
 #[async_trait::async_trait]
@@ -45,8 +50,16 @@ impl Cognition for LLMService {
         self.orchestrate_step(agent_id, goal, history, project_context).await
     }
 
-    fn model_id(&self) -> &str {
-        &self.model_id
+    fn model_id(&self) -> String {
+        self.model_id.read().unwrap().clone()
+    }
+
+    async fn list_models(&self) -> Result<Vec<String>> {
+        self.list_models().await
+    }
+
+    async fn set_model(&self, model_id: &str) -> Result<()> {
+        self.set_model(model_id)
     }
 }
 
@@ -77,6 +90,9 @@ pub enum OrchestrationAction {
     StopJob { name: String },
     ListJobs,
     DelegateTask { agent: String, goal: String },
+    // New Async Actions
+    CallAgent { tool: String, args: Vec<String> },
+    AwaitJob { job_id: String },
 }
 
 impl LLMService {
@@ -91,29 +107,33 @@ impl LLMService {
         // Load AWS config from environment
         let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let bedrock_client = BedrockClient::new(&aws_config);
+        let bedrock_control = BedrockControlClient::new(&aws_config);
 
         info!("📦 Using model: {}", config.model_id);
 
         Ok(Self {
             bedrock_client,
+            bedrock_control,
             db,
             timeline,
-            model_id: config.model_id.clone(),
+            model_id: Arc::new(RwLock::new(config.model_id.clone())),
         })
     }
 
     /// Create LLMService with a custom Bedrock client (for testing).
     pub fn with_client(
         bedrock_client: BedrockClient,
+        bedrock_control: BedrockControlClient,
         db: SurrealClient,
         timeline: TimelineService,
         model_id: String,
     ) -> Self {
         Self {
             bedrock_client,
+            bedrock_control,
             db,
             timeline,
-            model_id,
+            model_id: Arc::new(RwLock::new(model_id)),
         }
     }
 
@@ -129,11 +149,13 @@ impl LLMService {
             .build()
             .context("Failed to build message")?;
 
+        let model_id = self.model_id.read().unwrap().clone();
+
         // Call Bedrock Converse API
         let response = self
             .bedrock_client
             .converse()
-            .model_id(&self.model_id)
+            .model_id(model_id)
             .messages(user_message)
             .send()
             .await
@@ -174,7 +196,7 @@ impl LLMService {
 
         Ok(LLMResponse {
             content,
-            model_id: self.model_id.clone(),
+            model_id: self.model_id.read().unwrap().clone(),
             input_tokens,
             output_tokens,
             duration_ms: end,
@@ -193,7 +215,8 @@ impl LLMService {
         // Fetch agent persona if available
         let agent: Option<Agent> = self.db.select_by_id("agents", agent_id).await.unwrap_or(None);
         let agent_prompt = agent.as_ref().and_then(|a| a.system_prompt.as_deref());
-        let dynamic_model_id = agent.as_ref().and_then(|a| a.model_id.as_deref()).unwrap_or(&self.model_id);
+        let current_model = self.model_id.read().unwrap().clone();
+        let dynamic_model_id = agent.as_ref().and_then(|a| a.model_id.as_deref()).unwrap_or(&current_model);
 
         // Build combined prompt with context and request
         let system_prompt = self.build_orchestration_prompt(project_context, agent_prompt).await?;
@@ -261,7 +284,8 @@ impl LLMService {
         // Fetch agent persona if available
         let agent: Option<Agent> = self.db.select_by_id("agents", agent_id).await.unwrap_or(None);
         let agent_prompt = agent.as_ref().and_then(|a| a.system_prompt.as_deref());
-        let dynamic_model_id = agent.as_ref().and_then(|a| a.model_id.as_deref()).unwrap_or(&self.model_id);
+        let current_model = self.model_id.read().unwrap().clone();
+        let dynamic_model_id = agent.as_ref().and_then(|a| a.model_id.as_deref()).unwrap_or(&current_model);
 
         // Build System Context
         let system_context = self.build_orchestration_prompt(project_context, agent_prompt).await?;
@@ -373,6 +397,8 @@ You can perform these actions by responding with JSON:
 13. Stop background job: {{"action": "stop_job", "name": "server"}}
 14. List background jobs: {{"action": "list_jobs"}}
 15. Delegate task to another agent: {{"action": "delegate_task", "agent": "<developer|researcher|reviewer>", "goal": "<goal>"}}
+16. Call external agent/tool: {{"action": "call_agent", "tool": "<gh|aws|kubectl>", "args": ["arg1", "arg2"]}}
+17. Await background job: {{"action": "await_job", "job_id": "<job_id>"}}
 Respond with a JSON array of actions to execute, or a single {{"action": "chat", "response": "your message"}} for conversational responses.
 
 Example: [{{"action": "create_project", "name": "my-app"}}, {{"action": "execute_shell", "command": "git init"}}]"#,
@@ -453,6 +479,16 @@ Example: [{{"action": "create_project", "name": "my-app"}}, {{"action": "execute
                     agent: raw.get("agent").and_then(|v| v.as_str()).unwrap_or("general").to_string(),
                     goal: raw.get("goal").and_then(|v| v.as_str()).unwrap_or("").to_string(),
                 },
+                "call_agent" => OrchestrationAction::CallAgent {
+                    tool: raw.get("tool").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                    args: raw.get("args")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                        .unwrap_or_default(),
+                },
+                "await_job" => OrchestrationAction::AwaitJob {
+                    job_id: raw.get("job_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                },
                 _ => OrchestrationAction::Chat {
                     response: raw.get("response").and_then(|v| v.as_str()).unwrap_or(response).to_string(),
                 },
@@ -465,8 +501,33 @@ Example: [{{"action": "create_project", "name": "my-app"}}, {{"action": "execute
     }
 
     /// Get the current model ID.
-    pub fn model_id(&self) -> &str {
-        &self.model_id
+    pub fn get_model_id(&self) -> String {
+        self.model_id.read().unwrap().clone()
+    }
+
+    /// List available foundation models from Bedrock.
+    pub async fn list_models(&self) -> Result<Vec<String>> {
+        // List only TEXT models that are active
+        let output = self.bedrock_control.list_foundation_models()
+            .by_output_modality(aws_sdk_bedrock::types::ModelModality::Text)
+            .send()
+            .await?;
+
+        let models: Vec<String> = output.model_summaries()
+            .iter()
+            .map(|m| m.model_id().to_string())
+            .filter(|id| id.contains("anthropic") || id.contains("amazon") || id.contains("meta"))
+            .collect();
+
+        Ok(models)
+    }
+
+    /// Set the active model ID dynamically.
+    pub fn set_model(&self, model_id: &str) -> Result<()> {
+        let mut guard = self.model_id.write().unwrap();
+        *guard = model_id.to_string();
+        info!("🔄 Switched active model to: {}", model_id);
+        Ok(())
     }
 }
 
@@ -492,8 +553,9 @@ mod tests {
         // We can pass a default client since we only test non-async logic here
         let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         let bedrock_client = BedrockClient::new(&config);
+        let bedrock_control = BedrockControlClient::new(&config);
 
-        LLMService::with_client(bedrock_client, db, timeline, "test-model".to_string())
+        LLMService::with_client(bedrock_client, bedrock_control, db, timeline, "test-model".to_string())
     }
 
     #[tokio::test]

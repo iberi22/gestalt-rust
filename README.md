@@ -1,6 +1,6 @@
 # Gestalt CLI
 
-[![Git-Core Protocol](https://img.shields.io/badge/Git--Core%20Protocol-v3.2-blueviolet)](AGENTS.md)
+[![Git-Core Protocol](https://img.shields.io/badge/Git--Core%20Protocol-v3.5-blueviolet)](AGENTS.md)
 
 **Gestalt** is a context-aware AI assistant for your terminal. It intelligently gathers project context (files, structure, configs) to give LLMs the full picture of your work.
 
