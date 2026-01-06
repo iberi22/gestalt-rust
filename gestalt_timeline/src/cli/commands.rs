@@ -15,6 +15,10 @@ pub struct Cli {
     #[arg(long, global = true, default_value_t = true)]
     pub context: bool,
 
+    /// Agent mode: "build" (full access) or "plan" (read-only)
+    #[arg(long, global = true, default_value = "build")]
+    pub mode: String,
+
     /// The prompt to send to the agents (when not using subcommands)
     #[arg(short, long)]
     pub prompt: Option<String>,
@@ -197,4 +201,11 @@ pub enum Commands {
     /// Start an interactive chat session
     #[command(name = "chat")]
     Chat,
+
+    /// Index a repository for RAG-based code analysis
+    #[command(name = "index-repo")]
+    IndexRepo {
+        /// Repository URL (GitHub, GitLab, or local path)
+        url: String,
+    },
 }

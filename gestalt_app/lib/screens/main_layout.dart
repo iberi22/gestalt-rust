@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:glass_kit/glass_kit.dart';
 import 'dashboard_screen.dart';
 import 'project_list_screen.dart';
 import 'settings_screen.dart';
-import '../widgets/agent_status_pill.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -17,37 +18,66 @@ class _MainLayoutState extends State<MainLayout> {
   final List<Widget> _screens = [
     const DashboardScreen(),
     const ProjectListScreen(),
-    const Center(child: Text("Agents View (Coming Soon)", style: TextStyle(color: Colors.white))),
+    const Center(child: Text("Agent Forge", style: TextStyle(color: Colors.white, fontSize: 24))),
     const SettingsScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      body: Row(
+      extendBodyBehindAppBar: true,
+      body: Stack(
         children: [
-          // Sidebar
+          // Background Gradient
           Container(
-            width: 250,
-            color: const Color(0xFF1E1E1E),
-            child: Column(
-              children: [
-                const SizedBox(height: 30),
-                const Icon(Icons.hub, size: 50, color: Colors.blueAccent),
-                const SizedBox(height: 10),
-                const Text("GESTALT", style: TextStyle(color: Colors.white, fontSize: 20, letterSpacing: 2, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 40),
-                _navItem(Icons.dashboard, "Dashboard", 0),
-                _navItem(Icons.folder, "Projects", 1),
-                _navItem(Icons.memory, "Agents", 2),
-                _navItem(Icons.settings, "Settings", 3),
-              ],
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0F0C29), Color(0xFF302B63), Color(0xFF24243E)],
+              ),
             ),
           ),
-          // Main Content Area
-          Expanded(
-            child: _screens[_selectedIndex],
+          Row(
+            children: [
+              // Glass Sidebar
+              GlassContainer.clearGlass(
+                width: 260,
+                height: double.infinity,
+                borderWidth: 0,
+                blur: 20,
+                color: Colors.white.withOpacity(0.05),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 60),
+                    const Icon(Icons.auto_awesome_outlined, size: 48, color: Colors.purpleAccent)
+                        .animate()
+                        .shimmer(duration: 2.seconds),
+                    const SizedBox(height: 16),
+                    Text(
+                      "NEURAL LINK",
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 4,
+                          ),
+                    ),
+                    const SizedBox(height: 60),
+                    _navItem(Icons.grid_view_rounded, "Dashboard", 0),
+                    _navItem(Icons.code_rounded, "Repositories", 1),
+                    _navItem(Icons.psychology_rounded, "Agent Forge", 2),
+                    _navItem(Icons.tune_rounded, "Settings", 3),
+                  ],
+                ),
+              ),
+              // Main Content Area
+              Expanded(
+                child: _screens[_selectedIndex]
+                    .animate(key: ValueKey(_selectedIndex))
+                    .fadeIn(duration: 400.ms)
+                    .slideX(begin: 0.1, end: 0),
+              ),
+            ],
           ),
         ],
       ),
@@ -57,16 +87,33 @@ class _MainLayoutState extends State<MainLayout> {
   Widget _navItem(IconData icon, String label, int index) {
     final isSelected = _selectedIndex == index;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.blueAccent.withOpacity(0.1) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: isSelected ? Colors.blueAccent : Colors.white54),
-        title: Text(label, style: TextStyle(color: isSelected ? Colors.blueAccent : Colors.white54)),
-        selected: isSelected,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: InkWell(
         onTap: () => setState(() => _selectedIndex = index),
+        child: AnimatedContainer(
+          duration: 300.ms,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.purpleAccent.withOpacity(0.2) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? Colors.purpleAccent.withOpacity(0.5) : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: isSelected ? Colors.purpleAccent : Colors.white60),
+              const SizedBox(width: 16),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white60,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

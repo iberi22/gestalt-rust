@@ -61,6 +61,17 @@ pub struct SetModelRequest {
     pub model_id: String,
 }
 
+#[derive(Deserialize)]
+pub struct SetModeRequest {
+    pub mode: String, // "build" or "plan"
+}
+
+#[derive(serde::Serialize)]
+pub struct ModeResponse {
+    pub mode: String,
+    pub is_read_only: bool,
+}
+
 /// Start the Agent REST API server.
 pub async fn start_server(
     runtime: AgentRuntime,
@@ -90,6 +101,8 @@ pub async fn start_server(
         .route("/tasks/:id", put(update_task).delete(delete_task))
         .route("/tasks/:id/run", post(run_task_endpoint))
         .route("/tasks/:id/schedule", post(schedule_task_endpoint))
+        .route("/health", get(health_check))
+        .route("/config/mode", get(get_agent_mode).post(set_agent_mode)) // Agent mode toggle
         .layer(CorsLayer::permissive()) // Allow Flutter app to access
         .with_state(state);
 
@@ -299,4 +312,33 @@ async fn set_active_model(
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
+}
+
+/// Handler: Simple health check
+async fn health_check() -> StatusCode {
+    StatusCode::OK
+}
+
+/// Handler: Get current agent mode
+async fn get_agent_mode(
+    State(_state): State<AppState>,
+) -> Json<ModeResponse> {
+    // For now, return default. In production, this would read from AgentOrchestrator state.
+    Json(ModeResponse {
+        mode: "build".to_string(),
+        is_read_only: false,
+    })
+}
+
+/// Handler: Set agent mode
+async fn set_agent_mode(
+    State(_state): State<AppState>,
+    Json(payload): Json<SetModeRequest>,
+) -> (StatusCode, Json<ModeResponse>) {
+    let is_read_only = payload.mode.to_lowercase() == "plan";
+    info!("Agent mode set to: {} (read_only: {})", payload.mode, is_read_only);
+    (StatusCode::OK, Json(ModeResponse {
+        mode: payload.mode,
+        is_read_only,
+    }))
 }

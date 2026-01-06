@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:glass_kit/glass_kit.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../services/api_service.dart';
 import '../models/agent.dart';
 import '../models/project.dart';
@@ -29,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _refreshData();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
       _refreshData();
     });
   }
@@ -43,25 +45,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refreshData() async {
-    final projects = await _api.getProjects();
-    final agents = await _api.getAgents();
-    final logs = await _api.getTimeline();
+    try {
+      final projects = await _api.getProjects();
+      final agents = await _api.getAgents();
+      final logs = await _api.getTimeline();
 
-    if (mounted) {
-      setState(() {
-        _projects = projects;
-        _agents = agents;
-        _logs = logs;
-      });
+      if (mounted) {
+        setState(() {
+          _projects = projects;
+          _agents = agents;
+          _logs = logs;
+        });
 
-      // Auto-scroll logs if at bottom
-      if (_logController.hasClients && _logController.offset >= _logController.position.maxScrollExtent - 50) {
-        _logController.animateTo(
-           _logController.position.maxScrollExtent,
-           duration: const Duration(milliseconds: 300),
-           curve: Curves.easeOut
-        );
+        if (_logController.hasClients && _logController.offset >= _logController.position.maxScrollExtent - 50) {
+          _logController.animateTo(
+             _logController.position.maxScrollExtent,
+             duration: const Duration(milliseconds: 300),
+             curve: Curves.easeOut
+          );
+        }
       }
+    } catch (e) {
+      debugPrint("Error refreshing dashboard: $e");
     }
   }
 
@@ -77,9 +82,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // DashboardScreen is now just the content area. Navigation is handled by MainLayout.
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(32.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -87,110 +91,173 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("System Overview", style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ..._agents.map((a) => Padding(
-                    padding: const EdgeInsets.only(left: 8.0),
-                    child: AgentStatusPill(agent: a),
-                  )),
-                  IconButton(
-                    onPressed: () async {
-                      final ok = await _api.checkHealth();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(ok ? "System Online 🟢" : "System Offline 🔴")),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.monitor_heart, color: Colors.greenAccent),
-                    tooltip: "Health Check",
+                  Text(
+                    "System Architecture",
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const Text(
+                    "Monitoring local and cloud neural nodes",
+                    style: TextStyle(color: Colors.white54, fontSize: 16),
                   ),
                 ],
               ),
+              Row(
+                children: [
+                  ..._agents.map((a) => Padding(
+                    padding: const EdgeInsets.only(left: 12.0),
+                    child: AgentStatusPill(agent: a),
+                  )),
+                ],
+              ),
             ],
-          ),
-          const SizedBox(height: 24),
+          ).animate().fadeIn(duration: 600.ms).slideY(begin: -0.1, end: 0),
 
-          // Projects Grid (Horizontal Preview)
-          const Text("Recent Projects", style: TextStyle(color: Colors.white70, fontSize: 16)),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 160,
-            child: _projects.isEmpty
-              ? _emptyState("No active projects")
-              : ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _projects.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 16),
-                  itemBuilder: (context, index) => SizedBox(
-                    width: 280,
-                    child: ProjectCard(project: _projects[index]),
-                  ),
+          const SizedBox(height: 40),
+
+          // Primary Actions Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoCard(
+                  "ACTIVE AGENTS",
+                  "${_agents.length}",
+                  Icons.psychology,
+                  Colors.purpleAccent,
                 ),
-          ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: _buildInfoCard(
+                  "CONNECTED REPOS",
+                  "${_projects.length}",
+                  Icons.account_tree,
+                  Colors.blueAccent,
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                child: _buildInfoCard(
+                  "SYSTEM STATUS",
+                  "OPTIMAL",
+                  Icons.verified_user,
+                  Colors.greenAccent,
+                ),
+              ),
+            ],
+          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 40),
 
-          // Command Input
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2C2C2C),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.terminal, color: Colors.blueAccent),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _inputController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      hintText: "Enter a command or goal for the agent...",
-                      hintStyle: TextStyle(color: Colors.white30),
-                      border: InputBorder.none,
+          // Command Bar
+          GlassContainer.clearGlass(
+            height: 70,
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(16),
+            borderWidth: 1,
+            borderColor: Colors.white.withOpacity(0.1),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Icon(Icons.flash_on, color: Colors.orangeAccent),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _inputController,
+                      style: const TextStyle(color: Colors.white, fontSize: 18),
+                      decoration: const InputDecoration(
+                        hintText: "Issue a new directives to the swarm...",
+                        hintStyle: TextStyle(color: Colors.white24),
+                        border: InputBorder.none,
+                      ),
+                      onSubmitted: (_) => _sendCommand(),
                     ),
-                    onSubmitted: (_) => _sendCommand(),
                   ),
-                ),
-                IconButton(
-                  icon: _isLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.send, color: Colors.blueAccent),
-                  onPressed: _isLoading ? null : _sendCommand,
-                ),
-              ],
+                  if (_isLoading)
+                    const CircularProgressIndicator(color: Colors.purpleAccent, strokeWidth: 2)
+                  else
+                    IconButton(
+                      icon: const Icon(Icons.send_rounded, color: Colors.purpleAccent),
+                      onPressed: _sendCommand,
+                    ),
+                ],
+              ),
             ),
-          ),
+          ).animate().fadeIn(delay: 400.ms).scale(begin: const Offset(0.95, 0.95)),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 40),
 
-          // Logs
-          const Text("System Logs", style: TextStyle(color: Colors.white70, fontSize: 16)),
-          const SizedBox(height: 12),
+          // Log Terminal
           Expanded(
-            child: LogConsole(events: _logs, scrollController: _logController),
-          ),
+            child: GlassContainer.clearGlass(
+              width: double.infinity,
+              borderRadius: BorderRadius.circular(24),
+              borderWidth: 1,
+              borderColor: Colors.white.withOpacity(0.05),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.terminal, color: Colors.greenAccent, size: 20),
+                        const SizedBox(width: 12),
+                        const Text(
+                          "NEURAL LOG STREAM",
+                          style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, letterSpacing: 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(color: Colors.white10, height: 1),
+                  Expanded(
+                    child: LogConsole(events: _logs, scrollController: _logController),
+                  ),
+                ],
+              ),
+            ),
+          ).animate().fadeIn(delay: 600.ms),
         ],
       ),
     );
   }
 
-
-
-  Widget _emptyState(String message) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Center(
-        child: Text(message, style: const TextStyle(color: Colors.white30)),
+  Widget _buildInfoCard(String title, String value, IconData icon, Color color) {
+    return GlassContainer.clearGlass(
+      height: 120,
+      borderRadius: BorderRadius.circular(20),
+      borderWidth: 1,
+      borderColor: color.withOpacity(0.2),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(width: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(value, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

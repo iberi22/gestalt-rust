@@ -459,6 +459,24 @@ async fn main() -> anyhow::Result<()> {
             repl::run_repl(&agent_id, cognition).await?;
         }
 
+        Some(Commands::IndexRepo { url }) => {
+            // Check mode before write operation
+            if cli.mode.to_lowercase() == "plan" {
+                eprintln!("❌ Cannot index repository in 'plan' mode. Use '--mode build' for write operations.");
+                return Ok(());
+            }
+
+            println!("📥 Indexing repository: {}", url);
+            // Placeholder for actual indexing logic via AgentOrchestrator
+            // In production, this would call gestalt_core::application::agent::AgentOrchestrator::index_repo
+            println!("⚠️ Note: Full RAG indexing not yet implemented. This is a placeholder.");
+            if cli.json {
+                println!(r#"{{"status": "pending", "url": "{}"}}"#, url);
+            } else {
+                println!("✅ Repository queued for indexing: {}", url);
+            }
+        }
+
         None => {
              // No command provided. If prompt is also None (checked above), show help or REPL
              // But we handled prompt above. So if we are here, prompt was None and command was None.

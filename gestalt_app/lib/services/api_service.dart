@@ -189,4 +189,32 @@ class ApiService {
       return false;
     }
   }
+
+  /// Get current agent mode (build/plan)
+  Future<Map<String, dynamic>?> getMode() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/config/mode'));
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+    } catch (e) {
+      print('Error getting mode: $e');
+    }
+    return null;
+  }
+
+  /// Set agent mode (build/plan)
+  Future<bool> setMode(String mode) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/config/mode'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'mode': mode}),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error setting mode: $e');
+      return false;
+    }
+  }
 }

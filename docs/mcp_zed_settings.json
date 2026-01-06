@@ -1,0 +1,14 @@
+{
+  "context_servers": {
+    "neural-link": {
+      "command": "cargo",
+      "args": [
+        "run",
+        "--package",
+        "gestalt_mcp",
+        "--release",
+        "--"
+      ]
+    }
+  }
+}

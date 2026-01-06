@@ -3,7 +3,6 @@ use reqwest::Client;
 use serde_json::json;
 use std::env;
 use futures::stream::BoxStream;
-use futures::StreamExt;
 
 use crate::ports::outbound::llm_provider::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 

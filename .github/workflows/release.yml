@@ -1,0 +1,102 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-backend:
+    name: Build Backend (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      # Required for System Dependencies if any (e.g., OpenSSL)
+      # gestalt_core uses reqwest/native-tls which uses Schannel on Windows (built-in)
+      # gestalt_timeline uses surrealdb which might need some setup, but pure rust usually works or pre-built binaries
+
+      - name: Build Backend
+        run: cargo build --release -p gestalt_timeline
+
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neural-link-backend-windows
+          path: target/release/gestalt_timeline.exe
+
+  build-mobile:
+    name: Build Mobile (Android)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./gestalt_app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.27.0' # Matching local version approx
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload Mobile Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neural-link-app-android
+          path: gestalt_app/build/app/outputs/flutter-apk/app-release.apk
+
+  create-release:
+    name: Create Release
+    needs: [build-backend, build-mobile]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Backend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: neural-link-backend-windows
+
+      - name: Download Mobile Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: neural-link-app-android
+
+      - name: Generate Release Tag
+        id: tag
+        run: echo "release_tag=v2.0.$(date +'%Y%m%d%H%M')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          name: Neural-Link Platform ${{ steps.tag.outputs.release_tag }}
+          draft: false
+          prerelease: false
+          files: |
+            gestalt_timeline.exe
+            app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
