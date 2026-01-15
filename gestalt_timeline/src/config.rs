@@ -7,6 +7,7 @@ pub struct Settings {
     pub database: DatabaseSettings,
     pub cognition: CognitionSettings,
     pub agent: AgentSettings,
+    pub telegram: Option<TelegramSettings>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -27,6 +28,12 @@ pub struct CognitionSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct AgentSettings {
     pub id: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct TelegramSettings {
+    pub bot_token: String,
+    pub allowed_users: Option<Vec<String>>,
 }
 
 impl Settings {

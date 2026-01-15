@@ -208,4 +208,8 @@ pub enum Commands {
         /// Repository URL (GitHub, GitLab, or local path)
         url: String,
     },
+
+    /// Start the Telegram Bot listener
+    #[command(name = "bot")]
+    Bot,
 }

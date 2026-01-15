@@ -117,6 +117,7 @@ impl LLMService {
             db,
             timeline,
             model_id: Arc::new(RwLock::new(config.model_id.clone())),
+            subagents: Arc::new(SubagentRegistry::new()),
         })
     }
 
@@ -134,6 +135,7 @@ impl LLMService {
             db,
             timeline,
             model_id: Arc::new(RwLock::new(model_id)),
+            subagents: Arc::new(SubagentRegistry::new()),
         }
     }
 
@@ -142,10 +144,20 @@ impl LLMService {
         debug!("💬 Sending message to Claude: {}", message);
         let start = std::time::Instant::now();
 
+        // 1. Detect subagent mention (e.g., @coder, @researcher)
+        let (subagent, clean_message) = self.detect_subagent(message);
+
+        // 2. Build the final prompt with persona if subagent is detected
+        let mut final_message = clean_message;
+        if let Some(agent) = &subagent {
+            info!("🧙 Routing to subagent: {}", agent.name());
+            final_message = format!("SYSTEM: {}\n\nUSER: {}", agent.system_prompt(), final_message);
+        }
+
         // Build the message
         let user_message = Message::builder()
             .role(ConversationRole::User)
-            .content(ContentBlock::Text(message.to_string()))
+            .content(ContentBlock::Text(final_message))
             .build()
             .context("Failed to build message")?;
 
@@ -201,6 +213,20 @@ impl LLMService {
             output_tokens,
             duration_ms: end,
         })
+    }
+
+    /// Internal helper to detect subagent mention in prompt
+    fn detect_subagent(&self, prompt: &str) -> (Option<Arc<dyn Subagent>>, String) {
+        for word in prompt.split_whitespace() {
+            if word.starts_with('@') {
+                let name = &word[1..];
+                if let Some(agent) = self.subagents.get(name) {
+                    let clean_prompt = prompt.replace(word, "").trim().to_string();
+                    return (Some(agent), clean_prompt);
+                }
+            }
+        }
+        (None, prompt.to_string())
     }
 
     /// Orchestrate a workflow based on natural language description.

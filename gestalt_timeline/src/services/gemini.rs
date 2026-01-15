@@ -11,6 +11,8 @@ use crate::db::SurrealClient;
 use crate::models::{EventType, Project, Task};
 
 use crate::services::{Agent, TimelineService, Cognition, LLMResponse, OrchestrationAction, AuthService};
+use gestalt_core::application::subagent::{SubagentRegistry, Subagent};
+use std::sync::Arc;
 
 /// Gemini implementation of Cognition trait.
 #[derive(Clone)]
@@ -21,6 +23,7 @@ pub struct GeminiService {
     model_id: String,
     api_key: Option<String>,
     auth: Option<AuthService>,
+    subagents: Arc<SubagentRegistry>,
 }
 
 impl GeminiService {
@@ -46,6 +49,7 @@ impl GeminiService {
             model_id,
             api_key,
             auth,
+            subagents: Arc::new(SubagentRegistry::new()),
         })
     }
 
@@ -224,7 +228,18 @@ Example: [{{"action": "create_project", "name": "my-app"}}, {{"action": "create_
 impl Cognition for GeminiService {
     async fn chat(&self, agent_id: &str, message: &str) -> Result<LLMResponse> {
         let start = std::time::Instant::now();
-        let content = self.call_gemini(message).await?;
+
+        // 1. Detect subagent mention (e.g., @coder, @researcher)
+        let (subagent, clean_message) = self.detect_subagent(message);
+
+        // 2. Build final prompt with persona
+        let mut final_message = clean_message;
+        if let Some(agent) = &subagent {
+            tracing::info!("🧙 Gemini routing to subagent: {}", agent.name());
+            final_message = format!("SYSTEM: {}\n\nUSER: {}", agent.system_prompt(), final_message);
+        }
+
+        let content = self.call_gemini(&final_message).await?;
         let duration = start.elapsed();
 
         // Record in timeline
@@ -235,7 +250,7 @@ impl Cognition for GeminiService {
         Ok(LLMResponse {
             content,
             model_id: self.model_id.clone(),
-            input_tokens: 0, // Gemini API doesn't return this simply in v1beta
+            input_tokens: 0,
             output_tokens: 0,
             duration_ms: duration.as_millis() as u64,
         })
@@ -295,5 +310,21 @@ impl Cognition for GeminiService {
 
     async fn set_model(&self, _model_id: &str) -> Result<()> {
         Err(anyhow::anyhow!("Dynamic model selection not implemented for Gemini service"))
+    }
+}
+
+impl GeminiService {
+    /// Internal helper to detect subagent mention in prompt
+    fn detect_subagent(&self, prompt: &str) -> (Option<Arc<dyn Subagent>>, String) {
+        for word in prompt.split_whitespace() {
+            if word.starts_with('@') {
+                let name = &word[1..];
+                if let Some(agent) = self.subagents.get(name) {
+                    let clean_prompt = prompt.replace(word, "").trim().to_string();
+                    return (Some(agent), clean_prompt);
+                }
+            }
+        }
+        (None, prompt.to_string())
     }
 }

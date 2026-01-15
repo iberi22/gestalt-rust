@@ -1,5 +1,6 @@
 use crate::ports::outbound::llm_provider::{LlmProvider, LlmRequest};
 use crate::ports::outbound::repo_manager::{VectorDb, RepoManager};
+use crate::application::subagent::{SubagentRegistry, Subagent};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -17,6 +18,7 @@ pub struct AgentOrchestrator {
     llm: Arc<dyn LlmProvider>,
     vector_db: Arc<dyn VectorDb>,
     repo_manager: Arc<dyn RepoManager>,
+    subagents: SubagentRegistry,
     mode: std::sync::RwLock<AgentMode>,
     is_read_only: AtomicBool,
 }
@@ -31,6 +33,7 @@ impl AgentOrchestrator {
             llm,
             vector_db,
             repo_manager,
+            subagents: SubagentRegistry::new(),
             mode: std::sync::RwLock::new(AgentMode::Build),
             is_read_only: AtomicBool::new(false),
         }
@@ -54,10 +57,13 @@ impl AgentOrchestrator {
     }
 
     pub async fn ask_about_repo(&self, repo_url: &str, question: &str) -> anyhow::Result<String> {
-        // RAG: Get similar code chunks from Vector DB
+        // 1. Detect subagent mention (e.g., @coder, @researcher)
+        let (subagent, clean_question) = self.detect_subagent(question);
+
+        // 2. RAG: Get similar code chunks from Vector DB
         let similar_chunks = self.vector_db.search_similar("code", vec![0.0; 384], 5).await?;
 
-        // Build context from chunks
+        // 3. Build context from chunks
         let mut context = String::new();
         for chunk in similar_chunks {
             if let Some(text) = chunk.get("metadata").and_then(|m| m.get("text")).and_then(|t| t.as_str()) {
@@ -66,23 +72,43 @@ impl AgentOrchestrator {
             }
         }
 
-        // Prompt LLM with context
+        // 4. Prompt LLM with context
         let full_prompt = format!(
             "Use the following code context to answer the question about the repository {}:\n\nCONTEXT:\n{}\n\nQUESTION: {}",
-            repo_url, context, question
+            repo_url, context, clean_question
         );
 
-        let request = LlmRequest {
+        let mut request = LlmRequest {
             prompt: full_prompt,
             model: "gemini-1.5-pro".to_string(),
             temperature: 0.2,
             max_tokens: Some(1024),
         };
 
+        // 5. Apply subagent persona if detected
+        if let Some(agent) = subagent {
+            tracing::info!("Routing request to specialized subagent: {}", agent.name());
+            request = agent.process_request(request).await;
+        }
+
         let response = self.llm.generate(request).await
             .map_err(|e| anyhow::anyhow!("LLM Error: {:?}", e))?;
 
         Ok(response.content)
+    }
+
+    /// Internal helper to detect subagent mention in prompt
+    fn detect_subagent(&self, prompt: &str) -> (Option<Arc<dyn Subagent>>, String) {
+        for word in prompt.split_whitespace() {
+            if word.starts_with('@') {
+                let name = &word[1..];
+                if let Some(agent) = self.subagents.get(name) {
+                    let clean_prompt = prompt.replace(word, "").trim().to_string();
+                    return (Some(agent), clean_prompt);
+                }
+            }
+        }
+        (None, prompt.to_string())
     }
 
     /// Index a repository (writes to vector DB - requires Build mode)

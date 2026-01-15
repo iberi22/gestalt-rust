@@ -8,7 +8,8 @@ use gestalt_timeline::db::SurrealClient;
 use gestalt_timeline::config::Settings;
 use gestalt_timeline::services::{
     AgentService, LLMService, GeminiService, OrchestrationAction, ProjectService,
-    TaskService, TimelineService, WatchService, AgentRuntime, start_server, Cognition, AuthService
+    TaskService, TimelineService, WatchService, AgentRuntime, start_server, Cognition, AuthService,
+    TelegramService
 };
 use gestalt_core::context::{detector, scanner};
 use surrealdb::sql::Thing;
@@ -475,6 +476,21 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 println!("✅ Repository queued for indexing: {}", url);
             }
+        }
+
+        Some(Commands::Bot) => {
+            let telegram_settings = settings.telegram.ok_or_else(|| anyhow::anyhow!("Telegram settings not configured"))?;
+
+            // Initialize cognition service
+            let cognition = init_cognition(&db, &timeline_service, &settings.cognition).await?;
+
+            let bot_service = TelegramService::new(
+                telegram_settings.bot_token,
+                cognition,
+                telegram_settings.allowed_users,
+            );
+
+            bot_service.start().await?;
         }
 
         None => {
