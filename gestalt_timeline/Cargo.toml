@@ -28,7 +28,7 @@ dirs = "5.0"
 open = "5.0"
 
 # SurrealDB client (with embedded support for mem and rocksdb)
-surrealdb = { version = "2.0.5", features = ["kv-mem", "kv-rocksdb"] }
+surrealdb = { version = "2.5.0", features = ["kv-mem", "kv-rocksdb"] }
 
 # Date/Time
 chrono = { version = "0.4", features = ["serde"] }
