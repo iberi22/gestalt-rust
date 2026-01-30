@@ -5,6 +5,18 @@ use super::FileContext;
 
 pub fn scan_markdown_files(root: &Path) -> Vec<FileContext> {
     let mut files = Vec::new();
+
+    // Priority 1: Check for Git-Core Protocol files first (.gitcore/ARCHITECTURE.md)
+    let gitcore_path = root.join(".gitcore/ARCHITECTURE.md");
+    if gitcore_path.exists() {
+        if let Ok(content) = fs::read_to_string(&gitcore_path) {
+             files.push(FileContext {
+                path: ".gitcore/ARCHITECTURE.md".to_string(),
+                content, // Load full content for Architecture, it's critical
+            });
+        }
+    }
+
     let walker = WalkBuilder::new(root)
         .hidden(false) // Allow hidden files like .github
         .git_ignore(true)
@@ -14,6 +26,9 @@ pub fn scan_markdown_files(root: &Path) -> Vec<FileContext> {
         match result {
             Ok(entry) => {
                 let path = entry.path();
+                // Avoid duplicating if we already added it manually
+                if path.ends_with(".gitcore/ARCHITECTURE.md") { continue; }
+
                 if path.is_file() && path.extension().map_or(false, |ext| ext == "md") {
                     // Skip target/ and node_modules/ just in case .gitignore misses them
                     if path.to_string_lossy().contains("target") || path.to_string_lossy().contains("node_modules") {
