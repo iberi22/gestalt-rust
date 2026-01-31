@@ -68,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -1634087351;
+  int get rustContentHash => -603059519;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -80,6 +80,11 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 
 abstract class RustLibApi extends BaseApi {
   String crateApiSimpleGreet({required String name});
+
+  void crateApiMcpHandleMcpAction({
+    required String actionId,
+    required String value,
+  });
 
   Future<void> crateApiSimpleInitApp();
 
@@ -128,6 +133,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "greet", argNames: ["name"]);
 
   @override
+  void crateApiMcpHandleMcpAction({
+    required String actionId,
+    required String value,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(actionId, serializer);
+          sse_encode_String(value, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiMcpHandleMcpActionConstMeta,
+        argValues: [actionId, value],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMcpHandleMcpActionConstMeta => const TaskConstMeta(
+    debugName: "handle_mcp_action",
+    argNames: ["actionId", "value"],
+  );
+
+  @override
   Future<void> crateApiSimpleInitApp() {
     return handler.executeNormal(
       NormalTask(
@@ -136,7 +170,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 3,
             port: port_,
           );
         },
@@ -166,7 +200,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 3,
+              funcId: 4,
               port: port_,
             );
           },
@@ -194,7 +228,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_u_16(cols, serializer);
           sse_encode_u_16(rows, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -220,7 +254,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(input, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -246,7 +280,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(eventType, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -277,7 +311,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 7,
+              funcId: 8,
               port: port_,
             );
           },
@@ -309,7 +343,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 8,
+              funcId: 9,
               port: port_,
             );
           },
@@ -381,6 +415,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  double dco_decode_f_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as double;
+  }
+
+  @protected
   List<McpComponent> dco_decode_list_mcp_component(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_mcp_component).toList();
@@ -415,6 +455,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 4:
         return McpComponent_Column(
           children: dco_decode_list_mcp_component(raw[1]),
+        );
+      case 5:
+        return McpComponent_Image(
+          url: dco_decode_String(raw[1]),
+          alt: dco_decode_String(raw[2]),
+        );
+      case 6:
+        return McpComponent_ProgressBar(
+          progress: dco_decode_f_64(raw[1]),
+          label: dco_decode_String(raw[2]),
+        );
+      case 7:
+        return McpComponent_Input(
+          label: dco_decode_String(raw[1]),
+          fieldId: dco_decode_String(raw[2]),
         );
       default:
         throw Exception("unreachable");
@@ -501,6 +556,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  double sse_decode_f_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getFloat64();
+  }
+
+  @protected
   List<McpComponent> sse_decode_list_mcp_component(
     SseDeserializer deserializer,
   ) {
@@ -544,6 +605,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 4:
         var var_children = sse_decode_list_mcp_component(deserializer);
         return McpComponent_Column(children: var_children);
+      case 5:
+        var var_url = sse_decode_String(deserializer);
+        var var_alt = sse_decode_String(deserializer);
+        return McpComponent_Image(url: var_url, alt: var_alt);
+      case 6:
+        var var_progress = sse_decode_f_64(deserializer);
+        var var_label = sse_decode_String(deserializer);
+        return McpComponent_ProgressBar(
+          progress: var_progress,
+          label: var_label,
+        );
+      case 7:
+        var var_label = sse_decode_String(deserializer);
+        var var_fieldId = sse_decode_String(deserializer);
+        return McpComponent_Input(label: var_label, fieldId: var_fieldId);
       default:
         throw UnimplementedError('');
     }
@@ -664,6 +740,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_f_64(double self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putFloat64(self);
+  }
+
+  @protected
   void sse_encode_list_mcp_component(
     List<McpComponent> self,
     SseSerializer serializer,
@@ -706,6 +788,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case McpComponent_Column(children: final children):
         sse_encode_i_32(4, serializer);
         sse_encode_list_mcp_component(children, serializer);
+      case McpComponent_Image(url: final url, alt: final alt):
+        sse_encode_i_32(5, serializer);
+        sse_encode_String(url, serializer);
+        sse_encode_String(alt, serializer);
+      case McpComponent_ProgressBar(
+        progress: final progress,
+        label: final label,
+      ):
+        sse_encode_i_32(6, serializer);
+        sse_encode_f_64(progress, serializer);
+        sse_encode_String(label, serializer);
+      case McpComponent_Input(label: final label, fieldId: final fieldId):
+        sse_encode_i_32(7, serializer);
+        sse_encode_String(label, serializer);
+        sse_encode_String(fieldId, serializer);
     }
   }
 

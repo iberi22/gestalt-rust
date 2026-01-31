@@ -24,6 +24,9 @@ mixin _$McpComponent {
     required TResult Function(String content) markdown,
     required TResult Function(List<McpComponent> children) row,
     required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>({
@@ -32,6 +35,9 @@ mixin _$McpComponent {
     TResult? Function(String content)? markdown,
     TResult? Function(List<McpComponent> children)? row,
     TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>({
@@ -40,6 +46,9 @@ mixin _$McpComponent {
     TResult Function(String content)? markdown,
     TResult Function(List<McpComponent> children)? row,
     TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -49,6 +58,9 @@ mixin _$McpComponent {
     required TResult Function(McpComponent_Markdown value) markdown,
     required TResult Function(McpComponent_Row value) row,
     required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult? mapOrNull<TResult extends Object?>({
@@ -57,6 +69,9 @@ mixin _$McpComponent {
     TResult? Function(McpComponent_Markdown value)? markdown,
     TResult? Function(McpComponent_Row value)? row,
     TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
   }) => throw _privateConstructorUsedError;
   @optionalTypeArgs
   TResult maybeMap<TResult extends Object?>({
@@ -65,6 +80,9 @@ mixin _$McpComponent {
     TResult Function(McpComponent_Markdown value)? markdown,
     TResult Function(McpComponent_Row value)? row,
     TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
     required TResult orElse(),
   }) => throw _privateConstructorUsedError;
 }
@@ -177,6 +195,9 @@ class _$McpComponent_CardImpl extends McpComponent_Card {
     required TResult Function(String content) markdown,
     required TResult Function(List<McpComponent> children) row,
     required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
   }) {
     return card(title, content);
   }
@@ -189,6 +210,9 @@ class _$McpComponent_CardImpl extends McpComponent_Card {
     TResult? Function(String content)? markdown,
     TResult? Function(List<McpComponent> children)? row,
     TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
   }) {
     return card?.call(title, content);
   }
@@ -201,6 +225,9 @@ class _$McpComponent_CardImpl extends McpComponent_Card {
     TResult Function(String content)? markdown,
     TResult Function(List<McpComponent> children)? row,
     TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
     required TResult orElse(),
   }) {
     if (card != null) {
@@ -217,6 +244,9 @@ class _$McpComponent_CardImpl extends McpComponent_Card {
     required TResult Function(McpComponent_Markdown value) markdown,
     required TResult Function(McpComponent_Row value) row,
     required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
   }) {
     return card(this);
   }
@@ -229,6 +259,9 @@ class _$McpComponent_CardImpl extends McpComponent_Card {
     TResult? Function(McpComponent_Markdown value)? markdown,
     TResult? Function(McpComponent_Row value)? row,
     TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
   }) {
     return card?.call(this);
   }
@@ -241,6 +274,9 @@ class _$McpComponent_CardImpl extends McpComponent_Card {
     TResult Function(McpComponent_Markdown value)? markdown,
     TResult Function(McpComponent_Row value)? row,
     TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
     required TResult orElse(),
   }) {
     if (card != null) {
@@ -354,6 +390,9 @@ class _$McpComponent_ButtonImpl extends McpComponent_Button {
     required TResult Function(String content) markdown,
     required TResult Function(List<McpComponent> children) row,
     required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
   }) {
     return button(label, actionId);
   }
@@ -366,6 +405,9 @@ class _$McpComponent_ButtonImpl extends McpComponent_Button {
     TResult? Function(String content)? markdown,
     TResult? Function(List<McpComponent> children)? row,
     TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
   }) {
     return button?.call(label, actionId);
   }
@@ -378,6 +420,9 @@ class _$McpComponent_ButtonImpl extends McpComponent_Button {
     TResult Function(String content)? markdown,
     TResult Function(List<McpComponent> children)? row,
     TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
     required TResult orElse(),
   }) {
     if (button != null) {
@@ -394,6 +439,9 @@ class _$McpComponent_ButtonImpl extends McpComponent_Button {
     required TResult Function(McpComponent_Markdown value) markdown,
     required TResult Function(McpComponent_Row value) row,
     required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
   }) {
     return button(this);
   }
@@ -406,6 +454,9 @@ class _$McpComponent_ButtonImpl extends McpComponent_Button {
     TResult? Function(McpComponent_Markdown value)? markdown,
     TResult? Function(McpComponent_Row value)? row,
     TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
   }) {
     return button?.call(this);
   }
@@ -418,6 +469,9 @@ class _$McpComponent_ButtonImpl extends McpComponent_Button {
     TResult Function(McpComponent_Markdown value)? markdown,
     TResult Function(McpComponent_Row value)? row,
     TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
     required TResult orElse(),
   }) {
     if (button != null) {
@@ -523,6 +577,9 @@ class _$McpComponent_MarkdownImpl extends McpComponent_Markdown {
     required TResult Function(String content) markdown,
     required TResult Function(List<McpComponent> children) row,
     required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
   }) {
     return markdown(content);
   }
@@ -535,6 +592,9 @@ class _$McpComponent_MarkdownImpl extends McpComponent_Markdown {
     TResult? Function(String content)? markdown,
     TResult? Function(List<McpComponent> children)? row,
     TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
   }) {
     return markdown?.call(content);
   }
@@ -547,6 +607,9 @@ class _$McpComponent_MarkdownImpl extends McpComponent_Markdown {
     TResult Function(String content)? markdown,
     TResult Function(List<McpComponent> children)? row,
     TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
     required TResult orElse(),
   }) {
     if (markdown != null) {
@@ -563,6 +626,9 @@ class _$McpComponent_MarkdownImpl extends McpComponent_Markdown {
     required TResult Function(McpComponent_Markdown value) markdown,
     required TResult Function(McpComponent_Row value) row,
     required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
   }) {
     return markdown(this);
   }
@@ -575,6 +641,9 @@ class _$McpComponent_MarkdownImpl extends McpComponent_Markdown {
     TResult? Function(McpComponent_Markdown value)? markdown,
     TResult? Function(McpComponent_Row value)? row,
     TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
   }) {
     return markdown?.call(this);
   }
@@ -587,6 +656,9 @@ class _$McpComponent_MarkdownImpl extends McpComponent_Markdown {
     TResult Function(McpComponent_Markdown value)? markdown,
     TResult Function(McpComponent_Row value)? row,
     TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
     required TResult orElse(),
   }) {
     if (markdown != null) {
@@ -696,6 +768,9 @@ class _$McpComponent_RowImpl extends McpComponent_Row {
     required TResult Function(String content) markdown,
     required TResult Function(List<McpComponent> children) row,
     required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
   }) {
     return row(children);
   }
@@ -708,6 +783,9 @@ class _$McpComponent_RowImpl extends McpComponent_Row {
     TResult? Function(String content)? markdown,
     TResult? Function(List<McpComponent> children)? row,
     TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
   }) {
     return row?.call(children);
   }
@@ -720,6 +798,9 @@ class _$McpComponent_RowImpl extends McpComponent_Row {
     TResult Function(String content)? markdown,
     TResult Function(List<McpComponent> children)? row,
     TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
     required TResult orElse(),
   }) {
     if (row != null) {
@@ -736,6 +817,9 @@ class _$McpComponent_RowImpl extends McpComponent_Row {
     required TResult Function(McpComponent_Markdown value) markdown,
     required TResult Function(McpComponent_Row value) row,
     required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
   }) {
     return row(this);
   }
@@ -748,6 +832,9 @@ class _$McpComponent_RowImpl extends McpComponent_Row {
     TResult? Function(McpComponent_Markdown value)? markdown,
     TResult? Function(McpComponent_Row value)? row,
     TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
   }) {
     return row?.call(this);
   }
@@ -760,6 +847,9 @@ class _$McpComponent_RowImpl extends McpComponent_Row {
     TResult Function(McpComponent_Markdown value)? markdown,
     TResult Function(McpComponent_Row value)? row,
     TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
     required TResult orElse(),
   }) {
     if (row != null) {
@@ -869,6 +959,9 @@ class _$McpComponent_ColumnImpl extends McpComponent_Column {
     required TResult Function(String content) markdown,
     required TResult Function(List<McpComponent> children) row,
     required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
   }) {
     return column(children);
   }
@@ -881,6 +974,9 @@ class _$McpComponent_ColumnImpl extends McpComponent_Column {
     TResult? Function(String content)? markdown,
     TResult? Function(List<McpComponent> children)? row,
     TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
   }) {
     return column?.call(children);
   }
@@ -893,6 +989,9 @@ class _$McpComponent_ColumnImpl extends McpComponent_Column {
     TResult Function(String content)? markdown,
     TResult Function(List<McpComponent> children)? row,
     TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
     required TResult orElse(),
   }) {
     if (column != null) {
@@ -909,6 +1008,9 @@ class _$McpComponent_ColumnImpl extends McpComponent_Column {
     required TResult Function(McpComponent_Markdown value) markdown,
     required TResult Function(McpComponent_Row value) row,
     required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
   }) {
     return column(this);
   }
@@ -921,6 +1023,9 @@ class _$McpComponent_ColumnImpl extends McpComponent_Column {
     TResult? Function(McpComponent_Markdown value)? markdown,
     TResult? Function(McpComponent_Row value)? row,
     TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
   }) {
     return column?.call(this);
   }
@@ -933,6 +1038,9 @@ class _$McpComponent_ColumnImpl extends McpComponent_Column {
     TResult Function(McpComponent_Markdown value)? markdown,
     TResult Function(McpComponent_Row value)? row,
     TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
     required TResult orElse(),
   }) {
     if (column != null) {
@@ -954,5 +1062,590 @@ abstract class McpComponent_Column extends McpComponent {
   /// with the given fields replaced by the non-null parameter values.
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$McpComponent_ColumnImplCopyWith<_$McpComponent_ColumnImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$McpComponent_ImageImplCopyWith<$Res> {
+  factory _$$McpComponent_ImageImplCopyWith(
+    _$McpComponent_ImageImpl value,
+    $Res Function(_$McpComponent_ImageImpl) then,
+  ) = __$$McpComponent_ImageImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String url, String alt});
+}
+
+/// @nodoc
+class __$$McpComponent_ImageImplCopyWithImpl<$Res>
+    extends _$McpComponentCopyWithImpl<$Res, _$McpComponent_ImageImpl>
+    implements _$$McpComponent_ImageImplCopyWith<$Res> {
+  __$$McpComponent_ImageImplCopyWithImpl(
+    _$McpComponent_ImageImpl _value,
+    $Res Function(_$McpComponent_ImageImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? url = null, Object? alt = null}) {
+    return _then(
+      _$McpComponent_ImageImpl(
+        url: null == url
+            ? _value.url
+            : url // ignore: cast_nullable_to_non_nullable
+                  as String,
+        alt: null == alt
+            ? _value.alt
+            : alt // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$McpComponent_ImageImpl extends McpComponent_Image {
+  const _$McpComponent_ImageImpl({required this.url, required this.alt})
+    : super._();
+
+  @override
+  final String url;
+  @override
+  final String alt;
+
+  @override
+  String toString() {
+    return 'McpComponent.image(url: $url, alt: $alt)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$McpComponent_ImageImpl &&
+            (identical(other.url, url) || other.url == url) &&
+            (identical(other.alt, alt) || other.alt == alt));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, url, alt);
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$McpComponent_ImageImplCopyWith<_$McpComponent_ImageImpl> get copyWith =>
+      __$$McpComponent_ImageImplCopyWithImpl<_$McpComponent_ImageImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String title, String content) card,
+    required TResult Function(String label, String actionId) button,
+    required TResult Function(String content) markdown,
+    required TResult Function(List<McpComponent> children) row,
+    required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
+  }) {
+    return image(url, alt);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String title, String content)? card,
+    TResult? Function(String label, String actionId)? button,
+    TResult? Function(String content)? markdown,
+    TResult? Function(List<McpComponent> children)? row,
+    TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
+  }) {
+    return image?.call(url, alt);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String title, String content)? card,
+    TResult Function(String label, String actionId)? button,
+    TResult Function(String content)? markdown,
+    TResult Function(List<McpComponent> children)? row,
+    TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
+    required TResult orElse(),
+  }) {
+    if (image != null) {
+      return image(url, alt);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(McpComponent_Card value) card,
+    required TResult Function(McpComponent_Button value) button,
+    required TResult Function(McpComponent_Markdown value) markdown,
+    required TResult Function(McpComponent_Row value) row,
+    required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
+  }) {
+    return image(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(McpComponent_Card value)? card,
+    TResult? Function(McpComponent_Button value)? button,
+    TResult? Function(McpComponent_Markdown value)? markdown,
+    TResult? Function(McpComponent_Row value)? row,
+    TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
+  }) {
+    return image?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(McpComponent_Card value)? card,
+    TResult Function(McpComponent_Button value)? button,
+    TResult Function(McpComponent_Markdown value)? markdown,
+    TResult Function(McpComponent_Row value)? row,
+    TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
+    required TResult orElse(),
+  }) {
+    if (image != null) {
+      return image(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class McpComponent_Image extends McpComponent {
+  const factory McpComponent_Image({
+    required final String url,
+    required final String alt,
+  }) = _$McpComponent_ImageImpl;
+  const McpComponent_Image._() : super._();
+
+  String get url;
+  String get alt;
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$McpComponent_ImageImplCopyWith<_$McpComponent_ImageImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$McpComponent_ProgressBarImplCopyWith<$Res> {
+  factory _$$McpComponent_ProgressBarImplCopyWith(
+    _$McpComponent_ProgressBarImpl value,
+    $Res Function(_$McpComponent_ProgressBarImpl) then,
+  ) = __$$McpComponent_ProgressBarImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({double progress, String label});
+}
+
+/// @nodoc
+class __$$McpComponent_ProgressBarImplCopyWithImpl<$Res>
+    extends _$McpComponentCopyWithImpl<$Res, _$McpComponent_ProgressBarImpl>
+    implements _$$McpComponent_ProgressBarImplCopyWith<$Res> {
+  __$$McpComponent_ProgressBarImplCopyWithImpl(
+    _$McpComponent_ProgressBarImpl _value,
+    $Res Function(_$McpComponent_ProgressBarImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? progress = null, Object? label = null}) {
+    return _then(
+      _$McpComponent_ProgressBarImpl(
+        progress: null == progress
+            ? _value.progress
+            : progress // ignore: cast_nullable_to_non_nullable
+                  as double,
+        label: null == label
+            ? _value.label
+            : label // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$McpComponent_ProgressBarImpl extends McpComponent_ProgressBar {
+  const _$McpComponent_ProgressBarImpl({
+    required this.progress,
+    required this.label,
+  }) : super._();
+
+  @override
+  final double progress;
+  @override
+  final String label;
+
+  @override
+  String toString() {
+    return 'McpComponent.progressBar(progress: $progress, label: $label)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$McpComponent_ProgressBarImpl &&
+            (identical(other.progress, progress) ||
+                other.progress == progress) &&
+            (identical(other.label, label) || other.label == label));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, progress, label);
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$McpComponent_ProgressBarImplCopyWith<_$McpComponent_ProgressBarImpl>
+  get copyWith =>
+      __$$McpComponent_ProgressBarImplCopyWithImpl<
+        _$McpComponent_ProgressBarImpl
+      >(this, _$identity);
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String title, String content) card,
+    required TResult Function(String label, String actionId) button,
+    required TResult Function(String content) markdown,
+    required TResult Function(List<McpComponent> children) row,
+    required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
+  }) {
+    return progressBar(progress, label);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String title, String content)? card,
+    TResult? Function(String label, String actionId)? button,
+    TResult? Function(String content)? markdown,
+    TResult? Function(List<McpComponent> children)? row,
+    TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
+  }) {
+    return progressBar?.call(progress, label);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String title, String content)? card,
+    TResult Function(String label, String actionId)? button,
+    TResult Function(String content)? markdown,
+    TResult Function(List<McpComponent> children)? row,
+    TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
+    required TResult orElse(),
+  }) {
+    if (progressBar != null) {
+      return progressBar(progress, label);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(McpComponent_Card value) card,
+    required TResult Function(McpComponent_Button value) button,
+    required TResult Function(McpComponent_Markdown value) markdown,
+    required TResult Function(McpComponent_Row value) row,
+    required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
+  }) {
+    return progressBar(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(McpComponent_Card value)? card,
+    TResult? Function(McpComponent_Button value)? button,
+    TResult? Function(McpComponent_Markdown value)? markdown,
+    TResult? Function(McpComponent_Row value)? row,
+    TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
+  }) {
+    return progressBar?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(McpComponent_Card value)? card,
+    TResult Function(McpComponent_Button value)? button,
+    TResult Function(McpComponent_Markdown value)? markdown,
+    TResult Function(McpComponent_Row value)? row,
+    TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
+    required TResult orElse(),
+  }) {
+    if (progressBar != null) {
+      return progressBar(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class McpComponent_ProgressBar extends McpComponent {
+  const factory McpComponent_ProgressBar({
+    required final double progress,
+    required final String label,
+  }) = _$McpComponent_ProgressBarImpl;
+  const McpComponent_ProgressBar._() : super._();
+
+  double get progress;
+  String get label;
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$McpComponent_ProgressBarImplCopyWith<_$McpComponent_ProgressBarImpl>
+  get copyWith => throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$McpComponent_InputImplCopyWith<$Res> {
+  factory _$$McpComponent_InputImplCopyWith(
+    _$McpComponent_InputImpl value,
+    $Res Function(_$McpComponent_InputImpl) then,
+  ) = __$$McpComponent_InputImplCopyWithImpl<$Res>;
+  @useResult
+  $Res call({String label, String fieldId});
+}
+
+/// @nodoc
+class __$$McpComponent_InputImplCopyWithImpl<$Res>
+    extends _$McpComponentCopyWithImpl<$Res, _$McpComponent_InputImpl>
+    implements _$$McpComponent_InputImplCopyWith<$Res> {
+  __$$McpComponent_InputImplCopyWithImpl(
+    _$McpComponent_InputImpl _value,
+    $Res Function(_$McpComponent_InputImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? label = null, Object? fieldId = null}) {
+    return _then(
+      _$McpComponent_InputImpl(
+        label: null == label
+            ? _value.label
+            : label // ignore: cast_nullable_to_non_nullable
+                  as String,
+        fieldId: null == fieldId
+            ? _value.fieldId
+            : fieldId // ignore: cast_nullable_to_non_nullable
+                  as String,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+
+class _$McpComponent_InputImpl extends McpComponent_Input {
+  const _$McpComponent_InputImpl({required this.label, required this.fieldId})
+    : super._();
+
+  @override
+  final String label;
+  @override
+  final String fieldId;
+
+  @override
+  String toString() {
+    return 'McpComponent.input(label: $label, fieldId: $fieldId)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$McpComponent_InputImpl &&
+            (identical(other.label, label) || other.label == label) &&
+            (identical(other.fieldId, fieldId) || other.fieldId == fieldId));
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, label, fieldId);
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$McpComponent_InputImplCopyWith<_$McpComponent_InputImpl> get copyWith =>
+      __$$McpComponent_InputImplCopyWithImpl<_$McpComponent_InputImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function(String title, String content) card,
+    required TResult Function(String label, String actionId) button,
+    required TResult Function(String content) markdown,
+    required TResult Function(List<McpComponent> children) row,
+    required TResult Function(List<McpComponent> children) column,
+    required TResult Function(String url, String alt) image,
+    required TResult Function(double progress, String label) progressBar,
+    required TResult Function(String label, String fieldId) input,
+  }) {
+    return input(label, fieldId);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function(String title, String content)? card,
+    TResult? Function(String label, String actionId)? button,
+    TResult? Function(String content)? markdown,
+    TResult? Function(List<McpComponent> children)? row,
+    TResult? Function(List<McpComponent> children)? column,
+    TResult? Function(String url, String alt)? image,
+    TResult? Function(double progress, String label)? progressBar,
+    TResult? Function(String label, String fieldId)? input,
+  }) {
+    return input?.call(label, fieldId);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function(String title, String content)? card,
+    TResult Function(String label, String actionId)? button,
+    TResult Function(String content)? markdown,
+    TResult Function(List<McpComponent> children)? row,
+    TResult Function(List<McpComponent> children)? column,
+    TResult Function(String url, String alt)? image,
+    TResult Function(double progress, String label)? progressBar,
+    TResult Function(String label, String fieldId)? input,
+    required TResult orElse(),
+  }) {
+    if (input != null) {
+      return input(label, fieldId);
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(McpComponent_Card value) card,
+    required TResult Function(McpComponent_Button value) button,
+    required TResult Function(McpComponent_Markdown value) markdown,
+    required TResult Function(McpComponent_Row value) row,
+    required TResult Function(McpComponent_Column value) column,
+    required TResult Function(McpComponent_Image value) image,
+    required TResult Function(McpComponent_ProgressBar value) progressBar,
+    required TResult Function(McpComponent_Input value) input,
+  }) {
+    return input(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(McpComponent_Card value)? card,
+    TResult? Function(McpComponent_Button value)? button,
+    TResult? Function(McpComponent_Markdown value)? markdown,
+    TResult? Function(McpComponent_Row value)? row,
+    TResult? Function(McpComponent_Column value)? column,
+    TResult? Function(McpComponent_Image value)? image,
+    TResult? Function(McpComponent_ProgressBar value)? progressBar,
+    TResult? Function(McpComponent_Input value)? input,
+  }) {
+    return input?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(McpComponent_Card value)? card,
+    TResult Function(McpComponent_Button value)? button,
+    TResult Function(McpComponent_Markdown value)? markdown,
+    TResult Function(McpComponent_Row value)? row,
+    TResult Function(McpComponent_Column value)? column,
+    TResult Function(McpComponent_Image value)? image,
+    TResult Function(McpComponent_ProgressBar value)? progressBar,
+    TResult Function(McpComponent_Input value)? input,
+    required TResult orElse(),
+  }) {
+    if (input != null) {
+      return input(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class McpComponent_Input extends McpComponent {
+  const factory McpComponent_Input({
+    required final String label,
+    required final String fieldId,
+  }) = _$McpComponent_InputImpl;
+  const McpComponent_Input._() : super._();
+
+  String get label;
+  String get fieldId;
+
+  /// Create a copy of McpComponent
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$McpComponent_InputImplCopyWith<_$McpComponent_InputImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }

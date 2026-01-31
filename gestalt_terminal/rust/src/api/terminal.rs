@@ -1,17 +1,23 @@
-use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
+use portable_pty::{CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use std::sync::Mutex;
 use std::io::{Read, Write};
 use crate::frb_generated::StreamSink;
 use anyhow::Result;
 
 static PTY_WRITER: std::sync::LazyLock<Mutex<Option<Box<dyn Write + Send>>>> = std::sync::LazyLock::new(|| Mutex::new(None));
+static PTY_MASTER: std::sync::LazyLock<Mutex<Option<Box<dyn MasterPty + Send>>>> = std::sync::LazyLock::new(|| Mutex::new(None));
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn resize_terminal(cols: u16, rows: u16) -> Result<()> {
-    // Note: To properly resize, we'd need to keep the PtyPair or MasterPty around.
-    // For now, we only stored the writer.
-    // This is a simplification. If resizing is critical, we need to store the MasterPty.
-    // Let's defer resizing implementation or store MasterPty instead of just Writer.
+    let mut guard = PTY_MASTER.lock().unwrap();
+    if let Some(master) = guard.as_mut() {
+        master.resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })?;
+    }
     Ok(())
 }
 
@@ -34,10 +40,13 @@ pub fn init_terminal(sink: StreamSink<String>) -> Result<()> {
     let mut reader = pair.master.try_clone_reader()?;
     let writer = pair.master.take_writer()?;
 
-    // Store writer
+    // Store master and writer
     {
-        let mut guard = PTY_WRITER.lock().unwrap();
-        *guard = Some(writer);
+        let mut guard_writer = PTY_WRITER.lock().unwrap();
+        *guard_writer = Some(writer);
+
+        let mut guard_master = PTY_MASTER.lock().unwrap();
+        *guard_master = Some(pair.master);
     }
 
     // Spawn thread to read output

@@ -16,6 +16,12 @@ Stream<McpComponent> streamMcpUi() =>
 void simulateAgentEvent({required String eventType}) =>
     RustLib.instance.api.crateApiMcpSimulateAgentEvent(eventType: eventType);
 
+void handleMcpAction({required String actionId, required String value}) =>
+    RustLib.instance.api.crateApiMcpHandleMcpAction(
+      actionId: actionId,
+      value: value,
+    );
+
 @freezed
 sealed class McpComponent with _$McpComponent {
   const McpComponent._();
@@ -34,4 +40,14 @@ sealed class McpComponent with _$McpComponent {
       McpComponent_Row;
   const factory McpComponent.column({required List<McpComponent> children}) =
       McpComponent_Column;
+  const factory McpComponent.image({required String url, required String alt}) =
+      McpComponent_Image;
+  const factory McpComponent.progressBar({
+    required double progress,
+    required String label,
+  }) = McpComponent_ProgressBar;
+  const factory McpComponent.input({
+    required String label,
+    required String fieldId,
+  }) = McpComponent_Input;
 }

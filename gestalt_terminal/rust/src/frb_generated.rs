@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1634087351;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -603059519;
 
 // Section: executor
 
@@ -72,6 +72,39 @@ fn wire__crate__api__simple__greet_impl(
                 let output_ok = Result::<_, ()>::Ok(crate::api::simple::greet(api_name))?;
                 Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__mcp__handle_mcp_action_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "handle_mcp_action",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_action_id = <String>::sse_decode(&mut deserializer);
+            let api_value = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::mcp::handle_mcp_action(api_action_id, api_value)?;
+                    Ok(output_ok)
+                })(),
+            )
         },
     )
 }
@@ -395,6 +428,13 @@ impl SseDecode for crate::api::simple::AgentEvent {
     }
 }
 
+impl SseDecode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_f64::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for Vec<crate::api::mcp::McpComponent> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -460,6 +500,30 @@ impl SseDecode for crate::api::mcp::McpComponent {
                     children: var_children,
                 };
             }
+            5 => {
+                let mut var_url = <String>::sse_decode(deserializer);
+                let mut var_alt = <String>::sse_decode(deserializer);
+                return crate::api::mcp::McpComponent::Image {
+                    url: var_url,
+                    alt: var_alt,
+                };
+            }
+            6 => {
+                let mut var_progress = <f64>::sse_decode(deserializer);
+                let mut var_label = <String>::sse_decode(deserializer);
+                return crate::api::mcp::McpComponent::ProgressBar {
+                    progress: var_progress,
+                    label: var_label,
+                };
+            }
+            7 => {
+                let mut var_label = <String>::sse_decode(deserializer);
+                let mut var_fieldId = <String>::sse_decode(deserializer);
+                return crate::api::mcp::McpComponent::Input {
+                    label: var_label,
+                    field_id: var_fieldId,
+                };
+            }
             _ => {
                 unimplemented!("");
             }
@@ -509,10 +573,10 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        2 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        3 => wire__crate__api__terminal__init_terminal_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__simple__stream_agent_events_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__mcp__stream_mcp_ui_impl(port, ptr, rust_vec_len, data_len),
+        3 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire__crate__api__terminal__init_terminal_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__simple__stream_agent_events_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__mcp__stream_mcp_ui_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -526,9 +590,10 @@ fn pde_ffi_dispatcher_sync_impl(
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
         1 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__terminal__resize_terminal_impl(ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__terminal__send_terminal_input_impl(ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__mcp__simulate_agent_event_impl(ptr, rust_vec_len, data_len),
+        2 => wire__crate__api__mcp__handle_mcp_action_impl(ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__terminal__resize_terminal_impl(ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__terminal__send_terminal_input_impl(ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__mcp__simulate_agent_event_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -593,6 +658,24 @@ impl flutter_rust_bridge::IntoDart for crate::api::mcp::McpComponent {
             crate::api::mcp::McpComponent::Column { children } => {
                 [4.into_dart(), children.into_into_dart().into_dart()].into_dart()
             }
+            crate::api::mcp::McpComponent::Image { url, alt } => [
+                5.into_dart(),
+                url.into_into_dart().into_dart(),
+                alt.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::mcp::McpComponent::ProgressBar { progress, label } => [
+                6.into_dart(),
+                progress.into_into_dart().into_dart(),
+                label.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::mcp::McpComponent::Input { label, field_id } => [
+                7.into_dart(),
+                label.into_into_dart().into_dart(),
+                field_id.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
             _ => {
                 unimplemented!("");
             }
@@ -674,6 +757,13 @@ impl SseEncode for crate::api::simple::AgentEvent {
     }
 }
 
+impl SseEncode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_f64::<NativeEndian>(self).unwrap();
+    }
+}
+
 impl SseEncode for Vec<crate::api::mcp::McpComponent> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -719,6 +809,21 @@ impl SseEncode for crate::api::mcp::McpComponent {
             crate::api::mcp::McpComponent::Column { children } => {
                 <i32>::sse_encode(4, serializer);
                 <Vec<crate::api::mcp::McpComponent>>::sse_encode(children, serializer);
+            }
+            crate::api::mcp::McpComponent::Image { url, alt } => {
+                <i32>::sse_encode(5, serializer);
+                <String>::sse_encode(url, serializer);
+                <String>::sse_encode(alt, serializer);
+            }
+            crate::api::mcp::McpComponent::ProgressBar { progress, label } => {
+                <i32>::sse_encode(6, serializer);
+                <f64>::sse_encode(progress, serializer);
+                <String>::sse_encode(label, serializer);
+            }
+            crate::api::mcp::McpComponent::Input { label, field_id } => {
+                <i32>::sse_encode(7, serializer);
+                <String>::sse_encode(label, serializer);
+                <String>::sse_encode(field_id, serializer);
             }
             _ => {
                 unimplemented!("");

@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0A0A0A),
         scrollbarTheme: ScrollbarThemeData(
-           thumbColor: MaterialStateProperty.all(Colors.grey[800]),
+           thumbColor: WidgetStateProperty.all(Colors.grey[800]),
         ),
       ),
       home: const MainScreen(),
