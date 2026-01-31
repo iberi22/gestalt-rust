@@ -1,0 +1,363 @@
+warning: unused import: `std::future::Future`
+ --> E:\scripts-python\synapse-agentic\src\security\ports.rs:7:5
+  |
+7 | use std::future::Future;
+  |     ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> E:\scripts-python\synapse-agentic\src\framework\hive.rs:93:32
+   |
+93 |     pub fn spawn<A>(&mut self, mut agent: A) -> AgentHandle<A::Input>
+   |                                ----^^^^^
+   |                                |
+   |                                help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `limit`
+   --> E:\scripts-python\synapse-agentic\src\channels\adapters\slack.rs:179:29
+    |
+179 | ...sync fn receive(&self, limit: usize) -> Result<ReceiveResult, Ch...
+    |                           ^^^^^ help: if this is intentional, prefix it with an underscore: `_limit`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `PromptSkill` is never constructed
+  --> E:\scripts-python\synapse-agentic\src\decision\skill.rs:87:12
+   |
+87 | pub struct PromptSkill {
+   |            ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `new` is never used
+  --> E:\scripts-python\synapse-agentic\src\decision\skill.rs:95:12
+   |
+93 | impl PromptSkill {
+   | ---------------- associated function in this implementation
+94 |     /// Creates a new prompt-based skill.
+95 |     pub fn new(
+   |            ^^^
+
+warning: missing documentation for an associated function
+  --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:54:5
+   |
+54 |     pub fn new() -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> E:\scripts-python\synapse-agentic\src\lib.rs:47:9
+   |
+47 | #![warn(missing_docs)]
+   |         ^^^^^^^^^^^^
+
+warning: missing documentation for a method
+  --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:64:5
+   |
+64 |     pub async fn register_tool(&self, tool: impl Tool + 'static) {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+  --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:69:5
+   |
+69 |     pub async fn register_tool_boxed(&self, tool: Box<dyn Tool>) {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+  --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:79:5
+   |
+79 |     pub async fn list_tools(&self) -> Vec<ToolInfo> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+  --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:92:5
+   |
+92 |     pub async fn call_tool(&self, name: &str, ctx: &dyn ToolContext, args: Value) -> Result<Value> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:104:5
+    |
+104 |     pub async fn register_resource(&self, resource: impl Resource + 'static) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:109:5
+    |
+109 |     pub async fn register_resource_boxed(&self, resource: Box<dyn Resource>) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:114:5
+    |
+114 |     pub async fn list_resources(&self) -> Vec<ResourceInfo> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:128:5
+    |
+128 |     pub async fn read_resource(&self, uri: &str) -> Result<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:140:5
+    |
+140 |     pub async fn register_prompt(&self, prompt: impl Prompt + 'static) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:145:5
+    |
+145 |     pub async fn register_prompt_boxed(&self, prompt: Box<dyn Prompt>) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:150:5
+    |
+150 |     pub async fn list_prompts(&self) -> Vec<PromptInfo> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a method
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:163:5
+    |
+163 | /     pub async fn get_prompt(
+164 | |         &self,
+165 | |         name: &str,
+166 | |         arguments: HashMap<String, String>,
+167 | |     ) -> Result<crate::mcp::prompt::GetPromptResult> {
+    | |____________________________________________________^
+
+warning: missing documentation for a type alias
+   --> E:\scripts-python\synapse-agentic\src\mcp\registry.rs:191:1
+    |
+191 | pub type ToolRegistry = McpRegistry;
+    | ^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\resilience\domain.rs:229:29
+    |
+229 |     AllProvidersExhausted { message: String },
+    |                             ^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\resilience\domain.rs:237:21
+    |
+237 |     ProviderError { provider: String, message: String },
+    |                     ^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\resilience\domain.rs:237:39
+    |
+237 |     ProviderError { provider: String, message: String },
+    |                                       ^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\domain.rs:234:21
+    |
+234 |     MalformedJSON { message: String, position: Option<usize> },
+    |                     ^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\domain.rs:234:38
+    |
+234 |     MalformedJSON { message: String, position: Option<usize> },
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\domain.rs:236:20
+    |
+236 |     SizeExceeded { actual: usize, limit: usize },
+    |                    ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\domain.rs:236:35
+    |
+236 |     SizeExceeded { actual: usize, limit: usize },
+    |                                   ^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\domain.rs:238:22
+    |
+238 |     BlockedContent { reason: String },
+    |                      ^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\domain.rs:240:23
+    |
+240 |     SchemaViolation { path: String, message: String },
+    |                       ^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\domain.rs:240:37
+    |
+240 |     SchemaViolation { path: String, message: String },
+    |                                     ^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\ports.rs:102:19
+    |
+102 |     PIIRedacted { count: usize, types: Vec<String> },
+    |                   ^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\ports.rs:102:33
+    |
+102 |     PIIRedacted { count: usize, types: Vec<String> },
+    |                                 ^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\ports.rs:104:20
+    |
+104 |     JSONRepaired { issue: String },
+    |                    ^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\ports.rs:106:17
+    |
+106 |     Truncated { original_len: usize, new_len: usize },
+    |                 ^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\ports.rs:106:38
+    |
+106 |     Truncated { original_len: usize, new_len: usize },
+    |                                      ^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+   --> E:\scripts-python\synapse-agentic\src\security\ports.rs:108:23
+    |
+108 |     PatternsRemoved { count: usize },
+    |                       ^^^^^^^^^^^^
+
+warning: missing documentation for a variant
+  --> E:\scripts-python\synapse-agentic\src\parser\domain.rs:28:5
+   |
+28 |     Rust,
+   |     ^^^^
+
+warning: missing documentation for a variant
+  --> E:\scripts-python\synapse-agentic\src\parser\domain.rs:29:5
+   |
+29 |     Python,
+   |     ^^^^^^
+
+warning: missing documentation for a variant
+  --> E:\scripts-python\synapse-agentic\src\parser\domain.rs:30:5
+   |
+30 |     JavaScript,
+   |     ^^^^^^^^^^
+
+warning: missing documentation for a variant
+  --> E:\scripts-python\synapse-agentic\src\parser\domain.rs:31:5
+   |
+31 |     TypeScript,
+   |     ^^^^^^^^^^
+
+warning: missing documentation for a variant
+  --> E:\scripts-python\synapse-agentic\src\parser\domain.rs:32:5
+   |
+32 |     SQL,
+   |     ^^^
+
+warning: missing documentation for a variant
+  --> E:\scripts-python\synapse-agentic\src\parser\domain.rs:33:5
+   |
+33 |     Shell,
+   |     ^^^^^
+
+warning: missing documentation for a variant
+  --> E:\scripts-python\synapse-agentic\src\parser\domain.rs:34:5
+   |
+34 |     Other,
+   |     ^^^^^
+
+warning: missing documentation for a struct field
+  --> E:\scripts-python\synapse-agentic\src\channels\adapters\manager.rs:37:5
+   |
+37 |     pub message_id: MessageId,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> E:\scripts-python\synapse-agentic\src\channels\adapters\manager.rs:38:5
+   |
+38 |     pub channel: Channel,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> E:\scripts-python\synapse-agentic\src\channels\adapters\manager.rs:39:5
+   |
+39 |     pub timestamp: chrono::DateTime<chrono::Utc>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> E:\scripts-python\synapse-agentic\src\channels\adapters\manager.rs:40:5
+   |
+40 |     pub status: DeliveryStatus,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: missing documentation for a struct field
+  --> E:\scripts-python\synapse-agentic\src\channels\adapters\manager.rs:41:5
+   |
+41 |     pub external_id: Option<String>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `synapse-agentic` (lib) generated 47 warnings (run `cargo fix --lib -p synapse-agentic` to apply 3 suggestions)
+    Checking gestalt_core v0.1.0 (E:\scripts-python\gestalt-rust\gestalt_core)
+warning: unused import: `serde_json::json`
+ --> src\adapters\llm\gemini.rs:3:5
+  |
+3 | use serde_json::json;
+  |     ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `LlmProvider` and `LlmResponse`
+ --> src\application\subagent.rs:4:44
+  |
+4 | use crate::ports::outbound::llm_provider::{LlmProvider, LlmRequest, LlmResponse};
+  |                                            ^^^^^^^^^^^              ^^^^^^^^^^^
+
+error[E0599]: no method named `with_metadata` found for struct `synapse_agentic::decision::DecisionContext` in the current scope
+  --> src\application\agent\gestalt_agent.rs:63:26
+   |
+62 |                       let context = DecisionContext::new(&question)
+   |  ___________________________________-
+63 | |                         .with_metadata("repo_url", repo_url.clone())
+   | |_________________________-^^^^^^^^^^^^^
+   |
+help: there is a method `with_data` with a similar name, but with different arguments
+  --> E:\scripts-python\synapse-agentic\src\decision\context.rs:63:5
+   |
+63 |     pub fn with_data(mut self, data: Value) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `csrf_token`
+  --> src\adapters\auth\google_pkce.rs:38:24
+   |
+38 |         let (auth_url, csrf_token) = self.client
+   |                        ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_csrf_token`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+error[E0521]: borrowed data escapes outside of method
+  --> src\adapters\persistence\surreal_db.rs:32:28
+   |
+30 |       async fn search_similar(&self, collection: &str, _vector: Vec<f32>, limit: usize) -> anyhow::Result<Vec<serde_json::Value>> {
+   |                                      ----------  - lifetime `'life1` defined here
+   |                                      |
+   |                                      `collection` is a reference that is only valid in the method body
+31 |           // SurrealDB 1.x doesn't have native vector search, use simple query for now
+32 |           let mut response = self.db.query("SELECT * FROM type::table($table) LIMIT $limit")
+   |  ____________________________^
+33 | |             .bind(("table", collection))
+   | |                                        ^
+   | |                                        |
+   | |________________________________________`collection` escapes the method body here
+   |                                          argument requires that `'life1` must outlive `'static`
+
+Some errors have detailed explanations: E0521, E0599.
+For more information about an error, try `rustc --explain E0521`.
+warning: `gestalt_core` (lib) generated 3 warnings
+error: could not compile `gestalt_core` (lib) due to 2 previous errors; 3 warnings emitted

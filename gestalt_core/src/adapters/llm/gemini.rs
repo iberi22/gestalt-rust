@@ -1,11 +1,12 @@
 use async_trait::async_trait;
 use reqwest::Client;
-use serde_json::json;
+use serde_json;
 use std::env;
 use futures::stream::BoxStream;
 
 use crate::ports::outbound::llm_provider::{LlmError, LlmProvider, LlmRequest, LlmResponse};
 
+#[derive(Debug)]
 pub struct GeminiProvider {
     client: Client,
     model: String,
@@ -33,7 +34,7 @@ impl LlmProvider for GeminiProvider {
             self.model, api_key
         );
 
-        let body = json!({
+        let body = serde_json::json!({
             "contents": [{
                 "parts": [{
                     "text": request.prompt
@@ -82,7 +83,7 @@ impl LlmProvider for GeminiProvider {
             self.model, api_key
         );
 
-        let body = json!({
+        let body = serde_json::json!({
             "contents": [{
                 "parts": [{
                     "text": request.prompt
@@ -131,5 +132,28 @@ impl LlmProvider for GeminiProvider {
         };
 
         Ok(Box::pin(stream))
+    }
+}
+
+#[async_trait]
+impl synapse_agentic::decision::LLMProvider for GeminiProvider {
+    fn name(&self) -> &str {
+        "gemini-1.5-pro"
+    }
+
+    fn cost_per_1k_tokens(&self) -> f64 {
+        0.001 // Benchmark value
+    }
+
+    async fn generate(&self, prompt: &str) -> anyhow::Result<String> {
+        let request = LlmRequest {
+            prompt: prompt.to_string(),
+            model: self.model.clone(),
+            temperature: 0.7,
+            max_tokens: Some(2048),
+        };
+        let response = LlmProvider::generate(self, request).await
+            .map_err(|e| anyhow::anyhow!("Gemini Error: {:?}", e))?;
+        Ok(response.content)
     }
 }

@@ -30,7 +30,7 @@ impl VectorDb for SurrealDbAdapter {
     async fn search_similar(&self, collection: &str, _vector: Vec<f32>, limit: usize) -> anyhow::Result<Vec<serde_json::Value>> {
         // SurrealDB 1.x doesn't have native vector search, use simple query for now
         let mut response = self.db.query("SELECT * FROM type::table($table) LIMIT $limit")
-            .bind(("table", collection))
+            .bind(("table", collection.to_string()))
             .bind(("limit", limit))
             .await?;
 

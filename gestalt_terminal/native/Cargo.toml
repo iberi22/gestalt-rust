@@ -1,9 +1,0 @@
-[package]
-name = "native"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-anyhow = "1.0.100"
-flutter_rust_bridge = "=2.11.1"
-[workspace]

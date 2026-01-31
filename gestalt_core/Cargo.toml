@@ -18,7 +18,7 @@ reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
 oauth2 = "4.4"
 
 # Interop
-flutter_rust_bridge = "2.0.0-dev.28"
+flutter_rust_bridge = "=2.11.1"
 
 # Error Handling
 thiserror = "1.0"
@@ -55,6 +55,7 @@ hf-hub = { version = "0.3.2", features = ["tokio"] }
 tokenizers = "0.20.0"
 octocrab = "0.38"
 surrealdb = { version = "2.0.5", features = ["kv-mem"] }
+synapse-agentic = { path = "../../synapse-agentic" }
 
 
 [lib]

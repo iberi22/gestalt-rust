@@ -5,6 +5,23 @@
 
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
+part 'simple.freezed.dart';
+
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
 
 String greet({required String name}) =>
     RustLib.instance.api.crateApiSimpleGreet(name: name);
+
+Stream<AgentEvent> streamAgentEvents() =>
+    RustLib.instance.api.crateApiSimpleStreamAgentEvents();
+
+@freezed
+sealed class AgentEvent with _$AgentEvent {
+  const AgentEvent._();
+
+  const factory AgentEvent.thought(String field0) = AgentEvent_Thought;
+  const factory AgentEvent.action(String field0) = AgentEvent_Action;
+  const factory AgentEvent.result(String field0) = AgentEvent_Result;
+  const factory AgentEvent.done(String field0) = AgentEvent_Done;
+}
