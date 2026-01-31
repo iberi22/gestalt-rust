@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use std::io::{Read, Write};
 use crate::frb_generated::StreamSink;
 use anyhow::Result;
+use crate::api::mcp::simulate_agent_event; // Import simulation logic
 
 static PTY_WRITER: std::sync::LazyLock<Mutex<Option<Box<dyn Write + Send>>>> = std::sync::LazyLock::new(|| Mutex::new(None));
 static PTY_MASTER: std::sync::LazyLock<Mutex<Option<Box<dyn MasterPty + Send>>>> = std::sync::LazyLock::new(|| Mutex::new(None));
@@ -70,6 +71,26 @@ pub fn init_terminal(sink: StreamSink<String>) -> Result<()> {
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn send_terminal_input(input: String) -> Result<()> {
+    // Intercept special "gestalt" commands before sending to PTY
+    // Note: input usually comes character by character or line by line depending on terminal mode.
+    // However, xterm.dart's onInput usually sends chunks.
+    // For a real CLI, we'd need a proper line buffer.
+    // BUT, for this MVP demo, let's look for "gestalt" keywords in the input if it's a full command (e.g. pasted)
+    // OR we rely on a separate specific "command launcher" in the UI.
+    // The user requirement says "permitir lanzar comandos en una terminal emulada".
+    // So we should try to detect it.
+
+    // Simple heuristic: If the input contains "gestalt scan", trigger that event.
+    // In a real shell, the shell would execute `gestalt` binary.
+    // Here we are "hooking" the input stream.
+    if input.contains("gestalt scan") {
+        let _ = simulate_agent_event("analysis".to_string());
+    } else if input.contains("gestalt action") {
+         let _ = simulate_agent_event("action".to_string());
+    } else if input.contains("gestalt chat") {
+         let _ = simulate_agent_event("result".to_string()); // Using 'result' for chat placeholder for now
+    }
+
     let mut guard = PTY_WRITER.lock().unwrap();
     if let Some(writer) = guard.as_mut() {
         write!(writer, "{}", input)?;

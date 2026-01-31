@@ -43,6 +43,7 @@ class _MainScreenState extends State<MainScreen> {
 
   // MCP UI components
   final List<McpComponent> _mcpComponents = [];
+  String _agentStatus = "IDLE";
 
   @override
   void initState() {
@@ -56,10 +57,10 @@ class _MainScreenState extends State<MainScreen> {
 
     _initStreams();
 
-    // Simulate initial agent event to show capabilities
-    // Delayed slightly to allow UI to settle
-    Future.delayed(const Duration(seconds: 1), () {
-      simulateAgentEvent(eventType: "analysis");
+    // Welcome message
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _terminal.write("\r\n\x1B[1;32mGestalt Terminal System v1.0\x1B[0m\r\n");
+      _terminal.write("Type 'gestalt scan' to analyze project...\r\n\r\n$ ");
     });
   }
 
@@ -113,27 +114,23 @@ class _MainScreenState extends State<MainScreen> {
                     padding: const EdgeInsets.all(12),
                     alignment: Alignment.centerLeft,
                     color: const Color(0xFF1A1A1A),
-                    child: const Text("AGENT CONTEXT", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2))
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("AGENT CONTEXT", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _agentStatus == "IDLE" ? Colors.grey[800] : Colors.green[900],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(_agentStatus, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                        )
+                      ],
+                    )
                 ),
                 Expanded(
                   child: McpUiRenderer(components: _mcpComponents),
-                ),
-                // Test buttons for demonstration
-                 Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Wrap(
-                    spacing: 8,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () => simulateAgentEvent(eventType: "analysis"),
-                        child: const Text("Sim Analysis")
-                      ),
-                       ElevatedButton(
-                        onPressed: () => simulateAgentEvent(eventType: "action"),
-                        child: const Text("Sim Action")
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),
