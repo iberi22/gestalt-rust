@@ -35,7 +35,7 @@ impl GoogleAuthFlow {
     pub async fn login(&self) -> anyhow::Result<GeminiCliToken> {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
-        let (auth_url, csrf_token) = self.client
+        let (auth_url, _csrf_token) = self.client
             .authorize_url(CsrfToken::new_random)
             .add_scope(Scope::new("https://www.googleapis.com/auth/cloud-platform".to_string()))
             .add_scope(Scope::new("https://www.googleapis.com/auth/userinfo.email".to_string()))

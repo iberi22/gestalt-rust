@@ -1,4 +1,4 @@
-use flutter_rust_bridge::StreamSink;
+use crate::frb_generated::StreamSink;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

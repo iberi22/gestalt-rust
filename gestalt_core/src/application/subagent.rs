@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::ports::outbound::llm_provider::{LlmProvider, LlmRequest, LlmResponse};
+use crate::ports::outbound::llm_provider::LlmRequest;
 
 /// A specialized subagent that can process prompts with a specific focus.
 #[async_trait]

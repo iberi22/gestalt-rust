@@ -4361,14 +4361,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "native"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "flutter_rust_bridge",
-]
-
-[[package]]
 name = "native-tls"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6990,7 +6982,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "surrealdb",
- "thiserror 2.0.17",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
  "tracing-subscriber",
