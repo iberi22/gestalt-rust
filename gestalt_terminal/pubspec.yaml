@@ -39,6 +39,7 @@ dependencies:
   google_fonts: ^6.2.1
   rust_lib_gestalt_terminal:
     path: rust_builder
+  xterm: ^4.0.0
 
 dev_dependencies:
   flutter_test:

@@ -3,7 +3,9 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/mcp.dart';
 import 'api/simple.dart';
+import 'api/terminal.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -66,7 +68,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => 1256088257;
+  int get rustContentHash => -1634087351;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -81,7 +83,17 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiSimpleInitApp();
 
+  Stream<String> crateApiTerminalInitTerminal();
+
+  void crateApiTerminalResizeTerminal({required int cols, required int rows});
+
+  void crateApiTerminalSendTerminalInput({required String input});
+
+  void crateApiMcpSimulateAgentEvent({required String eventType});
+
   Stream<AgentEvent> crateApiSimpleStreamAgentEvents();
+
+  Stream<McpComponent> crateApiMcpStreamMcpUi();
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -143,6 +155,117 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "init_app", argNames: []);
 
   @override
+  Stream<String> crateApiTerminalInitTerminal() {
+    final sink = RustStreamSink<String>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_String_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 3,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: sse_decode_AnyhowException,
+          ),
+          constMeta: kCrateApiTerminalInitTerminalConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiTerminalInitTerminalConstMeta =>
+      const TaskConstMeta(debugName: "init_terminal", argNames: ["sink"]);
+
+  @override
+  void crateApiTerminalResizeTerminal({required int cols, required int rows}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_16(cols, serializer);
+          sse_encode_u_16(rows, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiTerminalResizeTerminalConstMeta,
+        argValues: [cols, rows],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTerminalResizeTerminalConstMeta =>
+      const TaskConstMeta(
+        debugName: "resize_terminal",
+        argNames: ["cols", "rows"],
+      );
+
+  @override
+  void crateApiTerminalSendTerminalInput({required String input}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(input, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiTerminalSendTerminalInputConstMeta,
+        argValues: [input],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTerminalSendTerminalInputConstMeta =>
+      const TaskConstMeta(
+        debugName: "send_terminal_input",
+        argNames: ["input"],
+      );
+
+  @override
+  void crateApiMcpSimulateAgentEvent({required String eventType}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(eventType, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiMcpSimulateAgentEventConstMeta,
+        argValues: [eventType],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMcpSimulateAgentEventConstMeta =>
+      const TaskConstMeta(
+        debugName: "simulate_agent_event",
+        argNames: ["eventType"],
+      );
+
+  @override
   Stream<AgentEvent> crateApiSimpleStreamAgentEvents() {
     final sink = RustStreamSink<AgentEvent>();
     unawaited(
@@ -154,7 +277,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 3,
+              funcId: 7,
               port: port_,
             );
           },
@@ -174,6 +297,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiSimpleStreamAgentEventsConstMeta =>
       const TaskConstMeta(debugName: "stream_agent_events", argNames: ["sink"]);
 
+  @override
+  Stream<McpComponent> crateApiMcpStreamMcpUi() {
+    final sink = RustStreamSink<McpComponent>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_mcp_component_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 8,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: sse_decode_AnyhowException,
+          ),
+          constMeta: kCrateApiMcpStreamMcpUiConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiMcpStreamMcpUiConstMeta =>
+      const TaskConstMeta(debugName: "stream_mcp_ui", argNames: ["sink"]);
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -181,7 +336,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustStreamSink<String> dco_decode_StreamSink_String_Sse(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
   RustStreamSink<AgentEvent> dco_decode_StreamSink_agent_event_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<McpComponent> dco_decode_StreamSink_mcp_component_Sse(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -212,9 +381,50 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<McpComponent> dco_decode_list_mcp_component(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_mcp_component).toList();
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  McpComponent dco_decode_mcp_component(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    switch (raw[0]) {
+      case 0:
+        return McpComponent_Card(
+          title: dco_decode_String(raw[1]),
+          content: dco_decode_String(raw[2]),
+        );
+      case 1:
+        return McpComponent_Button(
+          label: dco_decode_String(raw[1]),
+          actionId: dco_decode_String(raw[2]),
+        );
+      case 2:
+        return McpComponent_Markdown(content: dco_decode_String(raw[1]));
+      case 3:
+        return McpComponent_Row(
+          children: dco_decode_list_mcp_component(raw[1]),
+        );
+      case 4:
+        return McpComponent_Column(
+          children: dco_decode_list_mcp_component(raw[1]),
+        );
+      default:
+        throw Exception("unreachable");
+    }
+  }
+
+  @protected
+  int dco_decode_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -237,7 +447,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustStreamSink<String> sse_decode_StreamSink_String_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
   RustStreamSink<AgentEvent> sse_decode_StreamSink_agent_event_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<McpComponent> sse_decode_StreamSink_mcp_component_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -275,10 +501,58 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<McpComponent> sse_decode_list_mcp_component(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <McpComponent>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_mcp_component(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  McpComponent sse_decode_mcp_component(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var tag_ = sse_decode_i_32(deserializer);
+    switch (tag_) {
+      case 0:
+        var var_title = sse_decode_String(deserializer);
+        var var_content = sse_decode_String(deserializer);
+        return McpComponent_Card(title: var_title, content: var_content);
+      case 1:
+        var var_label = sse_decode_String(deserializer);
+        var var_actionId = sse_decode_String(deserializer);
+        return McpComponent_Button(label: var_label, actionId: var_actionId);
+      case 2:
+        var var_content = sse_decode_String(deserializer);
+        return McpComponent_Markdown(content: var_content);
+      case 3:
+        var var_children = sse_decode_list_mcp_component(deserializer);
+        return McpComponent_Row(children: var_children);
+      case 4:
+        var var_children = sse_decode_list_mcp_component(deserializer);
+        return McpComponent_Column(children: var_children);
+      default:
+        throw UnimplementedError('');
+    }
+  }
+
+  @protected
+  int sse_decode_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint16();
   }
 
   @protected
@@ -314,6 +588,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_StreamSink_String_Sse(
+    RustStreamSink<String> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
   void sse_encode_StreamSink_agent_event_Sse(
     RustStreamSink<AgentEvent> self,
     SseSerializer serializer,
@@ -323,6 +614,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_agent_event,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_mcp_component_Sse(
+    RustStreamSink<McpComponent> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_mcp_component,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -356,6 +664,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_mcp_component(
+    List<McpComponent> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_mcp_component(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -363,6 +683,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_mcp_component(McpComponent self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    switch (self) {
+      case McpComponent_Card(title: final title, content: final content):
+        sse_encode_i_32(0, serializer);
+        sse_encode_String(title, serializer);
+        sse_encode_String(content, serializer);
+      case McpComponent_Button(label: final label, actionId: final actionId):
+        sse_encode_i_32(1, serializer);
+        sse_encode_String(label, serializer);
+        sse_encode_String(actionId, serializer);
+      case McpComponent_Markdown(content: final content):
+        sse_encode_i_32(2, serializer);
+        sse_encode_String(content, serializer);
+      case McpComponent_Row(children: final children):
+        sse_encode_i_32(3, serializer);
+        sse_encode_list_mcp_component(children, serializer);
+      case McpComponent_Column(children: final children):
+        sse_encode_i_32(4, serializer);
+        sse_encode_list_mcp_component(children, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_u_16(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint16(self);
   }
 
   @protected
