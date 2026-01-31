@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:xterm/xterm.dart';
+import 'dart:async';
 import 'package:gestalt_terminal/src/rust/api/terminal.dart';
 import 'package:gestalt_terminal/src/rust/api/mcp.dart';
 import 'package:gestalt_terminal/src/rust/frb_generated.dart';
 import 'package:gestalt_terminal/mcp_ui.dart';
+import 'package:gestalt_terminal/services/api_client.dart';
 
 Future<void> main() async {
   await RustLib.init();
@@ -41,9 +43,14 @@ class _MainScreenState extends State<MainScreen> {
   final Terminal _terminal = Terminal(maxLines: 10000);
   late final TerminalController _terminalController;
 
+  // Services
+  final ApiClient _apiClient = ApiClient();
+  Timer? _pollingTimer;
+
   // MCP UI components
   final List<McpComponent> _mcpComponents = [];
-  String _agentStatus = "IDLE";
+  String _agentStatus = "OFFLINE";
+  final Set<String> _processedEventIds = {};
 
   @override
   void initState() {
@@ -52,16 +59,27 @@ class _MainScreenState extends State<MainScreen> {
 
     // Listen to input from the terminal (user typing) and send to PTY
     _terminal.onOutput = (data) {
+      // Check for chat command interception (simple heuristic for now)
+      // Note: This relies on the PTY echoing back or us intercepting before sending.
+      // Since 'data' here is raw input chars, intercepting complex commands is hard without a buffer.
+      // We rely on the Rust side interception for 'gestalt' commands for now.
       sendTerminalInput(input: data);
     };
 
     _initStreams();
+    _startPolling();
 
     // Welcome message
     Future.delayed(const Duration(milliseconds: 500), () {
       _terminal.write("\r\n\x1B[1;32mGestalt Terminal System v1.0\x1B[0m\r\n");
       _terminal.write("Type 'gestalt scan' to analyze project...\r\n\r\n$ ");
     });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initStreams() async {
@@ -72,13 +90,62 @@ class _MainScreenState extends State<MainScreen> {
       _terminal.write(data);
     });
 
-    // Initialize MCP UI Stream
+    // Initialize MCP UI Stream (Local Rust events)
     final mcpStream = streamMcpUi();
     mcpStream.listen((component) {
       setState(() {
         _mcpComponents.add(component);
       });
     });
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      // Health Check
+      final isOnline = await _apiClient.healthCheck();
+      setState(() {
+        _agentStatus = isOnline ? "ONLINE" : "OFFLINE";
+      });
+
+      if (isOnline) {
+        // Poll Timeline
+        final events = await _apiClient.getTimeline();
+        for (var event in events) {
+          final id = event['id'] as String? ?? 'unknown';
+          if (!_processedEventIds.contains(id)) {
+            _processedEventIds.add(id);
+            _addEventToUi(event);
+          }
+        }
+      }
+    });
+  }
+
+  void _addEventToUi(dynamic event) {
+    // Convert backend event to MCP Component
+    final eventType = event['event_type'] as String? ?? 'Unknown';
+    final payload = event['payload']; // Assuming JSON payload
+
+    McpComponent? component;
+
+    if (eventType == 'TaskCreated' || eventType == 'TaskStarted') {
+       final taskDesc = payload.toString();
+       component = McpComponent.card(
+         title: "New Task: $eventType",
+         content: taskDesc.length > 100 ? "${taskDesc.substring(0, 100)}..." : taskDesc
+       );
+    } else if (eventType == 'AgentConnected') {
+       component = const McpComponent.card(title: "System", content: "Agent Connected to Timeline.");
+    } else {
+       // Generic fallback
+       component = McpComponent.markdown(content: "**Event:** $eventType\n\n```json\n$payload\n```");
+    }
+
+    if (component != null) {
+      setState(() {
+        _mcpComponents.add(component);
+      });
+    }
   }
 
   @override

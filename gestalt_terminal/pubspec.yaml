@@ -41,6 +41,7 @@ dependencies:
     path: rust_builder
   xterm: ^4.0.0
   flutter_animate: ^4.5.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
