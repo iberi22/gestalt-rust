@@ -54,6 +54,7 @@ jobs:
     name: Build Backend (Windows)
     runs-on: windows-latest
     needs: [quality-gate]
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
