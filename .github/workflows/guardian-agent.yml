@@ -22,11 +22,10 @@ jobs:
       checks: read
     env:
       GH_TOKEN: ${{ github.token }}
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Get PR Info
         id: pr-info
@@ -84,12 +83,12 @@ jobs:
           # Auto-merge conditions (70% confidence threshold)
           if [ "$CI" = "true" ] && [ "$CONF" -ge 70 ]; then
             echo "decision=auto-merge" >> $GITHUB_OUTPUT
-            echo "ðŸ¤– Guardian: CONFIDENCE $CONF% - AUTO-MERGE ENABLED"
+            echo "🤖 Guardian: CONFIDENCE $CONF% - AUTO-MERGE ENABLED"
             
             # In production: gh pr merge $PR --auto --delete-branch
           else
             echo "decision=review-required" >> $GITHUB_OUTPUT
-            echo "ðŸ¤– Guardian: CONFIDENCE $CONF% - MANUAL REVIEW REQUIRED"
+            echo "🤖 Guardian: CONFIDENCE $CONF% - MANUAL REVIEW REQUIRED"
           fi
 
       - name: Post Decision
@@ -98,9 +97,9 @@ jobs:
           DECISION=${{ steps.decision.outputs.decision }}
           
           if [ "$DECISION" = "auto-merge" ]; then
-            BODY="ðŸ¤– **Guardian Decision**: AUTO-MERGE (Confidence: ${{ steps.confidence.outputs.confidence }}%)"
+            BODY="🤖 **Guardian Decision**: AUTO-MERGE (Confidence: ${{ steps.confidence.outputs.confidence }}%)"
             gh pr comment $PR --body "$BODY"
           else
-            BODY="ðŸ¤– **Guardian Decision**: Manual review required. CI must pass and confidence must be â‰¥70%."
+            BODY="🤖 **Guardian Decision**: Manual review required. CI must pass and confidence must be ≥70%."
             gh pr comment $PR --body "$BODY"
           fi

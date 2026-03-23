@@ -9,9 +9,6 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 permissions:
   contents: write
 
@@ -21,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -55,7 +52,7 @@ jobs:
     runs-on: windows-latest
     needs: [quality-gate]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -69,7 +66,7 @@ jobs:
         run: cargo build --release -p gestalt_timeline
 
       - name: Upload Backend Artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: neural-link-backend-windows
           path: target/release/gestalt.exe
@@ -93,7 +90,7 @@ jobs:
             artifact_name: gestalt-cli-macos
             binary_path: target/release/gestalt_cli
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Rust Cache
@@ -101,7 +98,7 @@ jobs:
       - name: Build CLI
         run: cargo build --release -p gestalt_cli
       - name: Upload CLI Artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.binary_path }}
@@ -114,10 +111,10 @@ jobs:
       run:
         working-directory: ./gestalt_app
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -135,7 +132,7 @@ jobs:
         run: flutter build apk --release
 
       - name: Upload Mobile Artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: neural-link-app-android
           path: gestalt_app/build/app/outputs/flutter-apk/app-release.apk
@@ -146,18 +143,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Backend Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: neural-link-backend-windows
           path: release-assets
 
       - name: Download CLI Artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: release-assets/cli-artifacts
 
       - name: Download Mobile Artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: neural-link-app-android
           path: release-assets
@@ -181,7 +178,7 @@ jobs:
           cp release-assets/cli-artifacts/gestalt-cli-macos/gestalt_cli release-assets/gestalt-cli-macos
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
           name: Gestalt ${{ steps.tag.outputs.release_tag }}
