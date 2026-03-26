@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   quality-gate:
@@ -165,10 +165,10 @@ jobs:
           cp release-assets/neural-link-backend-windows/gestalt.exe release-assets/gestalt_timeline.exe
           cp release-assets/neural-link-app-android/app-release.apk release-assets/app-release.apk
           cp release-assets/gestalt-cli-windows/gestalt_cli.exe release-assets/gestalt-cli-windows.exe
-          mkdir -p release-assets/gestalt-cli-linux
-          cp release-assets/gestalt-cli-linux/gestalt_cli release-assets/gestalt-cli-linux/gestalt_cli
-          mkdir -p release-assets/gestalt-cli-macos
-          cp release-assets/gestalt-cli-macos/gestalt_cli release-assets/gestalt-cli-macos/gestalt_cli
+          mkdir -p release-assets/linux
+          cp release-assets/gestalt-cli-linux/gestalt_cli release-assets/linux/gestalt
+          mkdir -p release-assets/macos
+          cp release-assets/gestalt-cli-macos/gestalt_cli release-assets/macos/gestalt
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -181,7 +181,7 @@ jobs:
             release-assets/gestalt_timeline.exe
             release-assets/app-release.apk
             release-assets/gestalt-cli-windows.exe
-            release-assets/gestalt-cli-linux
-            release-assets/gestalt-cli-macos
+            release-assets/linux/gestalt
+            release-assets/macos/gestalt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
