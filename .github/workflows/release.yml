@@ -162,13 +162,19 @@ jobs:
 
       - name: Prepare CLI Binaries
         run: |
-          cp release-assets/neural-link-backend-windows/gestalt.exe release-assets/gestalt_timeline.exe
-          cp release-assets/neural-link-app-android/app-release.apk release-assets/app-release.apk
-          cp release-assets/gestalt-cli-windows/gestalt_cli.exe release-assets/gestalt-cli-windows.exe
-          mkdir -p release-assets/gestalt-cli-linux
-          cp release-assets/gestalt-cli-linux/gestalt_cli release-assets/gestalt-cli-linux/gestalt_cli
-          mkdir -p release-assets/gestalt-cli-macos
-          cp release-assets/gestalt-cli-macos/gestalt_cli release-assets/gestalt-cli-macos/gestalt_cli
+          # Rename backend and mobile artifacts
+          mv release-assets/neural-link-backend-windows/gestalt.exe release-assets/gestalt_timeline.exe
+          mv release-assets/neural-link-app-android/app-release.apk release-assets/app-release.apk
+          # Rename CLI Windows artifact
+          mv release-assets/gestalt-cli-windows/gestalt_cli.exe release-assets/gestalt-cli-windows.exe
+          # Package Linux binary as tar.gz (binary is already in gestalt-cli-linux/)
+          mv release-assets/gestalt-cli-linux/gestalt_cli release-assets/gestalt-cli-linux/gestalt
+          tar -czf release-assets/gestalt-cli-linux.tar.gz -C release-assets gestalt-cli-linux
+          # Package macOS binary as tar.gz
+          mv release-assets/gestalt-cli-macos/gestalt_cli release-assets/gestalt-cli-macos/gestalt
+          tar -czf release-assets/gestalt-cli-macos.tar.gz -C release-assets gestalt-cli-macos
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -181,7 +187,7 @@ jobs:
             release-assets/gestalt_timeline.exe
             release-assets/app-release.apk
             release-assets/gestalt-cli-windows.exe
-            release-assets/gestalt-cli-linux
-            release-assets/gestalt-cli-macos
+            release-assets/gestalt-cli-linux.tar.gz
+            release-assets/gestalt-cli-macos.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
