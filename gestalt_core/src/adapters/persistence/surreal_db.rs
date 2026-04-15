@@ -1,16 +1,16 @@
 use crate::ports::outbound::repo_manager::{ScoredResult, VectorDb};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use surrealdb::engine::local::Db;
+use surrealdb::engine::any::Any;
 use surrealdb::Surreal;
 
 pub struct SurrealDbAdapter {
-    db: Surreal<Db>,
+    db: Surreal<Any>,
 }
 
 impl SurrealDbAdapter {
     pub async fn new() -> anyhow::Result<Self> {
-        let db = Surreal::new::<surrealdb::engine::local::Mem>(()).await?;
+        let db = surrealdb::engine::any::connect("mem://").await?;
         db.use_ns("neural").use_db("link").await?;
         Ok(Self { db })
     }
@@ -78,13 +78,13 @@ impl VectorDb for SurrealDbAdapter {
         let table = Self::sanitize_table_name(collection)?;
         let query = format!(
             "SELECT id, metadata, vector::similarity::cosine(embedding, $vector) AS score \
-             FROM {} WHERE embedding IS NOT NONE ORDER BY score DESC LIMIT $limit",
-            table
+             FROM type::table($table) WHERE embedding IS NOT NONE ORDER BY score DESC LIMIT $limit"
         );
 
         let mut response = self
             .db
-            .query(query)
+            .query(&query)
+            .bind(("table", table.clone()))
             .bind(("vector", vector))
             .bind(("limit", limit))
             .await?;

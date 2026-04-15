@@ -154,6 +154,16 @@ impl SurrealClient {
             DEFINE FIELD embedding ON chunks TYPE option<array<float, 384>>;
             DEFINE FIELD metadata ON chunks TYPE option<object>;
             DEFINE INDEX idx_chunk_doc ON chunks FIELDS doc_id;
+
+            DEFINE TABLE memories SCHEMAFULL;
+            DEFINE FIELD agent_id ON memories TYPE string;
+            DEFINE FIELD content ON memories TYPE string;
+            DEFINE FIELD context ON memories TYPE string;
+            DEFINE FIELD tags ON memories TYPE array<string>;
+            DEFINE FIELD importance ON memories TYPE float;
+            DEFINE FIELD created_at ON memories TYPE any;
+            DEFINE FIELD embedding ON memories TYPE option<array<float, 384>>;
+            DEFINE INDEX idx_memory_agent ON memories FIELDS agent_id;
             "#,
         )
         .await
@@ -164,6 +174,7 @@ impl SurrealClient {
             .query(
                 r#"
                 DEFINE INDEX idx_chunk_embedding ON chunks FIELDS embedding TYPE HNSW DIMENSION 384 DISTANCE COSINE;
+                DEFINE INDEX idx_memory_embedding ON memories FIELDS embedding TYPE HNSW DIMENSION 384 DISTANCE COSINE;
                 "#,
             )
             .await
@@ -256,6 +267,15 @@ impl SurrealClient {
     /// Access the underlying Surreal client.
     pub fn client(&self) -> Arc<Surreal<Any>> {
         self.db.clone()
+    }
+
+    /// Subscribe to a table or query using LIVE SELECT.
+    pub async fn subscribe<T: DeserializeOwned + Send + Sync + Unpin + 'static>(
+        &self,
+        table: &str,
+    ) -> Result<impl futures::Stream<Item = std::result::Result<surrealdb::Notification<T>, surrealdb::Error>>> {
+        let stream = self.db.select(table).live().await?;
+        Ok(stream)
     }
 
     /// Connect to an in-memory database (convenience for tests).

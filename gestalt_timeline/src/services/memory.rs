@@ -37,10 +37,13 @@ struct CortexHealthResponse {
     status: String,
 }
 
+use crate::models::timestamp::FlexibleTimestamp;
+
 /// A fragment of memory stored by an agent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryFragment {
     /// Unique ID for this memory
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<surrealdb::sql::Thing>,
     /// The agent that created this memory
     pub agent_id: String,
@@ -51,15 +54,12 @@ pub struct MemoryFragment {
     /// Searchable tags
     pub tags: Vec<String>,
     /// When this memory was created (UTC)
-    pub created_at: chrono::DateTime<Utc>,
+    pub created_at: FlexibleTimestamp,
     /// Importance score 0.0 - 1.0 (used for compaction priority)
     pub importance: f32,
-    /// Provenance: Repository URL
-    pub repo_url: Option<String>,
-    /// Provenance: File path
-    pub file_path: Option<String>,
-    /// Provenance: Chunk ID
-    pub chunk_id: Option<String>,
+    /// Vector embedding of the content
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embedding: Option<Vec<f32>>,
 }
 
 impl MemoryFragment {
@@ -75,24 +75,10 @@ impl MemoryFragment {
             content: content.into(),
             context: context.into(),
             tags,
-            created_at: Utc::now(),
+            created_at: FlexibleTimestamp::now(),
             importance: 0.5,
-            repo_url: None,
-            file_path: None,
-            chunk_id: None,
+            embedding: None,
         }
-    }
-
-    pub fn with_provenance(
-        mut self,
-        repo: Option<String>,
-        path: Option<String>,
-        chunk: Option<String>,
-    ) -> Self {
-        self.repo_url = repo;
-        self.file_path = path;
-        self.chunk_id = chunk;
-        self
     }
 
     pub fn with_importance(mut self, importance: f32) -> Self {
@@ -102,7 +88,7 @@ impl MemoryFragment {
 
     /// Convert to Cortex memory format
     fn to_cortex_memory(&self) -> CortexMemory {
-        let mut metadata = serde_json::json!({
+        let metadata = serde_json::json!({
             "agent_id": self.agent_id.clone(),
             "context": self.context.clone(),
             "tags": self.tags.clone(),
@@ -110,20 +96,12 @@ impl MemoryFragment {
             "created_at": self.created_at.to_rfc3339(),
         });
 
-        if let (Some(repo), Some(path), Some(chunk)) =
-            (&self.repo_url, &self.file_path, &self.chunk_id)
-        {
-            metadata["repo_url"] = serde_json::json!(repo);
-            metadata["file_path"] = serde_json::json!(path);
-            metadata["chunk_id"] = serde_json::json!(chunk);
-        }
-
         CortexMemory {
             path: format!(
                 "memory/{}/{}/{}",
                 self.agent_id,
                 self.context,
-                self.created_at.timestamp()
+                self.created_at.0.timestamp()
             ),
             content: self.content.clone(),
             kind: self.context.clone(),
@@ -284,19 +262,17 @@ impl MemoryService {
         }
     }
 
-    /// Save a memory fragment to short-term cache, Cortex (if available), and SurrealDB (fallback).
+    /// Save a memory fragment to short-term cache, Cortex (if available), and SurrealDB.
     pub async fn save(
         &self,
         agent_id: &str,
         content: impl Into<String>,
         context: impl Into<String>,
         tags: Vec<String>,
-        provenance: Option<(Option<String>, Option<String>, Option<String>)>,
+        embedding: Option<Vec<f32>>,
     ) -> Result<MemoryFragment> {
         let mut fragment = MemoryFragment::new(agent_id, content, context, tags);
-        if let Some((repo, path, chunk)) = provenance {
-            fragment = fragment.with_provenance(repo, path, chunk);
-        }
+        fragment.embedding = embedding;
 
         // Try Cortex first
         let cortex_available = self.is_cortex_available().await;
@@ -350,18 +326,44 @@ impl MemoryService {
         Ok(saved)
     }
 
-    /// Search memories by tags and content substring.
-    /// Returns the most recent matching fragments.
+    /// Search memories by tags and content substring, or vector similarity.
+    /// Returns the most relevant fragments.
     pub async fn search(
         &self,
         query: &str,
         agent_id: Option<&str>,
         limit: usize,
+        embedding: Option<Vec<f32>>,
     ) -> Result<Vec<MemoryFragment>> {
         info!(
             "🔍 Searching memories for '{}' (agent={:?}, limit={})",
             query, agent_id, limit
         );
+
+        // If we have an embedding, use SurrealDB vector search
+        if let Some(vector) = embedding {
+            let mut query_str = String::from(
+                "SELECT *, vector::similarity::cosine(embedding, $vector) AS score
+                 FROM memories WHERE embedding IS NOT NONE"
+            );
+            let mut bindings = serde_json::json!({ "vector": vector, "limit": limit as i64 });
+
+            if let Some(aid) = agent_id {
+                query_str.push_str(" AND agent_id = $agent_id");
+                bindings["agent_id"] = serde_json::json!(aid);
+            }
+
+            query_str.push_str(" ORDER BY score DESC LIMIT $limit");
+
+            let fragments: Vec<MemoryFragment> = self.db
+                .query_with(&query_str, bindings)
+                .await
+                .map_err(|e| anyhow::anyhow!("Vector memory search failed: {}", e))?;
+
+            if !fragments.is_empty() {
+                return Ok(fragments);
+            }
+        }
 
         // First check short-term cache for quick hits
         let stm = self.short_term.read().await;
@@ -422,22 +424,14 @@ impl MemoryService {
                                         .get("created_at")
                                         .and_then(|v| v.as_str())
                                         .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
-                                        .map(|dt| dt.with_timezone(&Utc))
-                                        .unwrap_or_else(Utc::now),
+                                        .map(|dt| FlexibleTimestamp(dt.with_timezone(&Utc)))
+                                        .unwrap_or_else(FlexibleTimestamp::now),
                                     importance: metadata
                                         .get("importance")
                                         .and_then(|v| v.as_f64())
                                         .unwrap_or(0.5)
                                         as f32,
-                                    repo_url: metadata
-                                        .get("repo_url")
-                                        .and_then(|v| v.as_str().map(String::from)),
-                                    file_path: metadata
-                                        .get("file_path")
-                                        .and_then(|v| v.as_str().map(String::from)),
-                                    chunk_id: metadata
-                                        .get("chunk_id")
-                                        .and_then(|v| v.as_str().map(String::from)),
+                                    embedding: None,
                                 })
                             })
                             .collect();
@@ -455,9 +449,17 @@ impl MemoryService {
         }
 
         // Fall back to SurrealDB query
+        let mut query_str = String::from("SELECT * FROM memories WHERE string::contains(string::lowercase(content), $q)");
+        let mut bindings = serde_json::json!({ "q": query_lower, "limit": limit as i64 });
+
+        if let Some(aid) = agent_id {
+            query_str.push_str(" AND agent_id = $agent_id");
+            bindings["agent_id"] = serde_json::json!(aid);
+        }
+        query_str.push_str(" ORDER BY created_at DESC LIMIT $limit");
+
         let fragments: Vec<MemoryFragment> = self.db
-            .query_with("SELECT * FROM memories WHERE string::contains(string::lowercase(content), $q) ORDER BY created_at DESC LIMIT $limit",
-                serde_json::json!({ "q": query_lower, "limit": limit as i64 }))
+            .query_with(&query_str, bindings)
             .await
             .map_err(|e| anyhow::anyhow!("Memory search query failed: {}", e))?;
 
@@ -495,9 +497,10 @@ impl MemoryService {
         agent_id: &str,
         query: Option<&str>,
         max_chars: usize,
+        embedding: Option<Vec<f32>>,
     ) -> String {
         let fragments = if let Some(q) = query {
-            self.search(q, Some(agent_id), 10).await.unwrap_or_default()
+            self.search(q, Some(agent_id), 10, embedding).await.unwrap_or_default()
         } else {
             self.recent(agent_id, 10).await.unwrap_or_default()
         };
@@ -508,22 +511,15 @@ impl MemoryService {
 
         let mut ctx = String::from("## Relevant Memories\n");
         for f in &fragments {
-            let provenance_marker = match (&f.repo_url, &f.file_path, &f.chunk_id) {
-                (Some(r), Some(p), Some(c)) => format!(" [{}|{}#{}]", r, p, c),
-                (None, Some(p), Some(c)) => format!(" [{}#{}]", p, c),
-                (None, Some(p), None) => format!(" [{}]", p),
-                _ => String::new(),
-            };
             let content_preview = if f.content.len() > 300 {
                 format!("{}...", &f.content[..300])
             } else {
                 f.content.clone()
             };
             let line = format!(
-                "- [{}] ({}){}: {}\n",
+                "- [{}] ({}): {}\n",
                 f.context,
-                f.created_at.format("%Y-%m-%d %H:%M"),
-                provenance_marker,
+                f.created_at.0.format("%Y-%m-%d %H:%M"),
                 content_preview
             );
             if ctx.len() + line.len() > max_chars {

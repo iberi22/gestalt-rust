@@ -65,7 +65,7 @@ impl WatchService {
     /// Start watching timeline events.
     ///
     /// This is the persistent process that runs until cancelled.
-    /// It polls for new events and broadcasts them to all subscribers.
+    /// It uses SurrealDB LIVE SELECT for real-time observation.
     pub async fn start_watching(
         &self,
         agent_id: &str,
@@ -80,71 +80,66 @@ impl WatchService {
             .emit(agent_id, EventType::AgentConnected)
             .await?;
 
-        let mut last_check = Utc::now();
-        let poll_interval = tokio::time::Duration::from_millis(500);
-
         // Setup graceful shutdown
         let running = self.running.clone();
 
         println!("🔭 Watch mode active. Press Ctrl+C to stop.");
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        loop {
-            if !running.load(Ordering::SeqCst) {
-                break;
-            }
+        use futures::StreamExt;
+        let mut stream = self.db.subscribe::<TimelineEvent>("timeline_events").await?;
 
-            // Query for new events since last check
-            // Note: In SurrealDB, string comparison works for ISO8601 timestamps
-            let query = match project_filter {
-                Some(pid) => format!(
-                    "SELECT * FROM timeline_events WHERE timestamp > $since AND project_id = '{}' ORDER BY timestamp ASC",
-                    pid
-                ),
-                None => "SELECT * FROM timeline_events WHERE timestamp > $since ORDER BY timestamp ASC".to_string(),
-            };
+        while running.load(Ordering::SeqCst) {
+            tokio::select! {
+                Some(notification) = stream.next() => {
+                    match notification {
+                        Ok(notification) => {
+                            use surrealdb::Action;
+                            if notification.action != Action::Create {
+                                continue;
+                            }
+                            let event = notification.data;
 
-            let events: Vec<TimelineEvent> = self
-                .db
-                .query_with(&query, ("since", last_check))
-                .await
-                .unwrap_or_default();
+                            // Apply project filter
+                            if let Some(pid) = project_filter {
+                                if event.project_id.as_deref() != Some(pid) {
+                                    continue;
+                                }
+                            }
 
-            for event in events {
-                // Use the inner DateTime<Utc> for comparison and updating last_check
-                let ts_utc = event.timestamp.0;
+                            // Apply event type filter if specified
+                            if let Some(ref filters) = event_filter {
+                                let event_str = event.event_type.to_string();
+                                if !filters.iter().any(|f| event_str.contains(f)) {
+                                    continue;
+                                }
+                            }
 
-                // Apply event type filter if specified
-                if let Some(ref filters) = event_filter {
-                    let event_str = event.event_type.to_string();
-                    if !filters.iter().any(|f| event_str.contains(f)) {
-                        continue;
+                            // Print event to console
+                            println!(
+                                "{} │ {:15} │ {:20} │ {}",
+                                event.timestamp.0.format("%H:%M:%S"),
+                                event.agent_id,
+                                event.event_type,
+                                event
+                                    .id
+                                    .as_ref()
+                                    .map(|x: &surrealdb::sql::Thing| x.to_string())
+                                    .unwrap_or_else(|| "none".to_string())
+                            );
+
+                            // Broadcast to subscribers
+                            let _ = self.tx.send(WatchMessage::Event(Box::new(event.clone())));
+                        }
+                        Err(e) => {
+                            debug!("Watch stream error: {}", e);
+                        }
                     }
                 }
-
-                // Print event to console
-                println!(
-                    "{} │ {:15} │ {:20} │ {}",
-                    ts_utc.format("%H:%M:%S"),
-                    event.agent_id,
-                    event.event_type,
-                    event
-                        .id
-                        .as_ref()
-                        .map(|x| x.to_string())
-                        .unwrap_or_else(|| "none".to_string())
-                );
-
-                // Update last_check to strictly follow the latest event seen
-                if ts_utc > last_check {
-                    last_check = ts_utc;
+                _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
+                    // Periodic check for running flag
                 }
-
-                // Broadcast to subscribers
-                let _ = self.tx.send(WatchMessage::Event(Box::new(event.clone())));
             }
-
-            tokio::time::sleep(poll_interval).await;
         }
 
         // Record agent disconnection

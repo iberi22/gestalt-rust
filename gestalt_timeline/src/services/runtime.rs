@@ -8,8 +8,9 @@ use tracing::{info, warn};
 
 use crate::models::{AgentRuntimeState, EventType, RuntimePhase, TimelineEvent};
 use crate::services::{
-    spawn_reviewer_agent, AgentService, ContextCompactor, FileManager, LockStatus, MemoryService,
-    ProjectService, ReviewerMessage, TaskService, TimelineService, VirtualFs, WatchService,
+    spawn_reviewer_agent, watch::WatchMessage, AgentService, ContextCompactor, FileManager,
+    LockStatus, MemoryService, ProjectService, ReviewerMessage, TaskService, TimelineService,
+    VirtualFs, WatchService,
 };
 use synapse_agentic::prelude::{
     CompactionConfig, Decision, DecisionContext, DecisionEngine, EmptyContext, Hive, Message,
@@ -257,27 +258,41 @@ impl AgentRuntime {
 
         let loop_result: Result<()> = async {
             let mut step = 0usize;
-            let mut last_poll_time = started_at.0;
+
+            // Real-time observation of events from other agents
+            let mut watch_rx = self.watch.subscribe();
 
             loop {
-                // Fetch recent events from other agents to maintain context
-                if let Ok(events) = self.timeline.get_events_since(last_poll_time).await {
-                    for event in events {
-                        if event.agent_id != self.agent_id {
-                            let mut session = self.session.lock().await;
-                            session.add_message(Message::new(
-                                MessageRole::User,
-                                format!(
-                                    "Observation (from {}): {:?} | {:?}",
-                                    event.agent_id, event.event_type, event.payload
-                                ),
-                            ));
-                            if event.timestamp.0 > last_poll_time {
-                                last_poll_time = event.timestamp.0;
+                // Process incoming events from other agents
+                while let Ok(msg) = watch_rx.try_recv() {
+                    match msg {
+                        WatchMessage::Event(event) => {
+                            if event.agent_id != self.agent_id {
+                                let mut session = self.session.lock().await;
+                                session.add_message(Message::new(
+                                    MessageRole::User,
+                                    format!(
+                                        "Observation (from {}): {:?} | {:?}",
+                                        event.agent_id, event.event_type, event.payload
+                                    ),
+                                ));
                             }
+                        }
+                        WatchMessage::Broadcast { agent_id, message } => {
+                            if agent_id != self.agent_id {
+                                let mut session = self.session.lock().await;
+                                session.add_message(Message::new(
+                                    MessageRole::User,
+                                    format!("Broadcast from {}: {}", agent_id, message),
+                                ));
+                            }
+                        }
+                        WatchMessage::Shutdown => {
+                            return Err(anyhow::anyhow!("Watch service shutdown"));
                         }
                     }
                 }
+
                 if let Some(limit) = self.hard_step_cap {
                     if step >= limit {
                         warn!("Hard safety cap reached at {} steps.", limit);
@@ -517,13 +532,29 @@ impl AgentRuntime {
                 .join("\n")
         };
 
+        // Inject Surreal-backed memory context
+        let memory_context = self
+            .memory
+            .build_context_string(&self.agent_id, Some(goal), 2000, None)
+            .await;
+
+        if !memory_context.is_empty() {
+            let _ = self
+                .timeline
+                .emit(&self.agent_id, EventType::Retrieval)
+                .await;
+        }
+
         let summary = if let Some(err) = error_feedback {
             format!(
-                "GOAL: {}\n\n⚠️ PREVIOUS ATTEMPT FAILED:\n{}\n\nPlease analyze the error and try a different approach to achieve the goal.\n\nhistory:\n{}",
-                goal, err, history_summary
+                "GOAL: {}\n\n{}\n\n⚠️ PREVIOUS ATTEMPT FAILED:\n{}\n\nPlease analyze the error and try a different approach to achieve the goal.\n\nhistory:\n{}",
+                goal, memory_context, err, history_summary
             )
         } else {
-            format!("goal: {}\n\nhistory:\n{}", goal, history_summary)
+            format!(
+                "goal: {}\n\n{}\n\nhistory:\n{}",
+                goal, memory_context, history_summary
+            )
         };
 
         let context = DecisionContext::new("orchestration").with_summary(summary);
