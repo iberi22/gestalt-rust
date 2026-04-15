@@ -1,16 +1,26 @@
 use super::tools::create_gestalt_tools;
 use super::AgentMode;
 use crate::ports::outbound::repo_manager::{RepoManager, VectorDb};
+use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
+use tokio::sync::{oneshot, Mutex};
 use synapse_agentic::framework::workflow::*;
 use synapse_agentic::prelude::*;
 
 #[derive(Debug)]
 pub enum GestaltInput {
-    Ask { repo_url: String, question: String },
-    Index { url: String },
-    Execute { command: String },
+    Ask {
+        repo_url: String,
+        question: String,
+        reply: oneshot::Sender<String>,
+    },
+    Index {
+        url: String,
+    },
+    Execute {
+        command: String,
+    },
     SetMode(AgentMode),
 }
 
@@ -19,6 +29,24 @@ pub struct GestaltAgent {
     _repo_manager: Arc<dyn RepoManager>,
     _mode: AgentMode,
     registry: ToolRegistry,
+    llm_provider: Arc<dyn LLMProvider>,
+    hive: Arc<Mutex<Hive>>,
+}
+
+#[derive(Debug, Clone)]
+struct ArcProvider(Arc<dyn LLMProvider>);
+
+#[async_trait]
+impl LLMProvider for ArcProvider {
+    fn name(&self) -> &str {
+        self.0.name()
+    }
+    fn cost_per_1k_tokens(&self) -> f64 {
+        self.0.cost_per_1k_tokens()
+    }
+    async fn generate(&self, prompt: &str) -> anyhow::Result<String> {
+        self.0.generate(prompt).await
+    }
 }
 
 impl GestaltAgent {
@@ -26,14 +54,18 @@ impl GestaltAgent {
         vector_db: Arc<dyn VectorDb>,
         repo_manager: Arc<dyn RepoManager>,
         llm_provider: Arc<dyn LLMProvider>,
+        hive: Arc<Mutex<Hive>>,
     ) -> Self {
         let registry =
-            create_gestalt_tools(repo_manager.clone(), vector_db.clone(), llm_provider).await;
+            create_gestalt_tools(repo_manager.clone(), vector_db.clone(), llm_provider.clone())
+                .await;
         Self {
             _vector_db: vector_db,
             _repo_manager: repo_manager,
             _mode: AgentMode::Build,
             registry,
+            llm_provider,
+            hive,
         }
     }
 }
@@ -56,9 +88,6 @@ impl GraphNode for GestaltNode {
     }
 
     /// Primary execution loop for the Gestalt reasoning process.
-    ///
-    /// Reads previous reasoning history and critic feedback from the state,
-    /// then uses the `DecisionEngine` to decide on the next action (tool call or final answer).
     async fn execute(&mut self, state: &mut ContextState) -> anyhow::Result<NodeResult> {
         let history = state.get_string("reasoning_history").unwrap_or_default();
         let critic_feedback = state.get_string("critic_feedback").unwrap_or_default();
@@ -75,7 +104,6 @@ impl GraphNode for GestaltNode {
 
         if step_index >= plan.len() {
             tracing::info!("All planned steps completed.");
-            state.set_value("final_answer", json!("Goal achieved according to plan."));
             return Ok(NodeResult::Halt);
         }
 
@@ -87,7 +115,6 @@ impl GraphNode for GestaltNode {
             current_task.description
         );
 
-        // Build context with history, feedback, and CURRENT PLAN STEP
         let mut context = DecisionContext::new(&self.question)
             .with_metadata("repo_url", self.repo_url.clone())
             .with_metadata("history", history.clone())
@@ -116,14 +143,10 @@ impl GraphNode for GestaltNode {
                         result
                     ));
                     state.set_value("reasoning_history", json!(updated_history));
-
-                    // Move to next step in the plan
                     state.set_value("current_step_index", json!(step_index + 1));
-
                     Ok(NodeResult::Continue(None))
                 }
                 Err(e) => {
-                    // Capture error for the ReflectionNode to handle
                     Ok(NodeResult::Error(format!(
                         "Step {} failed at tool {}: {}",
                         step_index + 1,
@@ -134,7 +157,6 @@ impl GraphNode for GestaltNode {
             }
         } else {
             tracing::info!("Agent provided final answer.");
-            println!("🤖 {}", decision.action);
             state.set_value("final_answer", json!(decision.action));
             Ok(NodeResult::Halt)
         }
@@ -151,48 +173,66 @@ impl Agent for GestaltAgent {
 
     async fn handle(&mut self, msg: Self::Input) -> anyhow::Result<()> {
         match msg {
-            GestaltInput::Ask { repo_url, question } => {
-                tracing::info!("Agent starting StateGraph flow for: {}", question);
+            GestaltInput::Ask {
+                repo_url,
+                question,
+                reply,
+            } => {
+                tracing::info!("Agent starting multi-agent orchestration for: {}", question);
 
-                // 1. Setup Decision Engine
-                let engine = DecisionEngine::builder()
-                    .with_provider(GeminiProvider::new(
-                        std::env::var("GEMINI_API_KEY").unwrap_or_default(),
-                        "gemini-1.5-pro".to_string(),
-                    ))
-                    .build();
-
-                // 2. Create the Node and Graph
-                let gestalt_node = GestaltNode {
-                    id: "gestalt_reasoner".to_string(),
-                    engine: engine.clone(),
-                    registry: self.registry.clone(),
-                    repo_url: repo_url.clone(),
-                    question: question.clone(),
-                };
-
-                // Critic will catch errors and route back to reasoner up to 10 times
-                let critic = ReflectionNode::new("critic", "gestalt_reasoner", 10);
-
-                let mut graph = StateGraph::new();
-                graph.add_node(Box::new(gestalt_node));
-                graph.add_node(Box::new(critic));
-
-                graph.set_entry_point("gestalt_reasoner");
-                graph.set_error_handler("critic");
-
-                // 3. Planning phase (Explicit Planning)
-                let context = DecisionContext::new(&question).with_metadata("repo_url", repo_url);
+                let context =
+                    DecisionContext::new(&question).with_metadata("repo_url", repo_url.clone());
                 let plan = self.plan(&question, &context).await?;
-                tracing::info!("Generated plan with {} steps", plan.len());
+                tracing::info!("Generated plan with {} tasks", plan.len());
 
-                // 4. Execute
-                let initial_state = ContextState::new(json!({
-                    "plan": plan,
-                    "current_step_index": 0
-                }));
-                let _final_state = graph.execute(initial_state).await?;
+                let mut task_results = Vec::new();
 
+                for task in plan {
+                    tracing::info!("Delegating task: {}", task.description);
+
+                    // Create a worker engine for the specific task execution
+                    let engine = DecisionEngine::builder()
+                        .with_provider(ArcProvider(self.llm_provider.clone()))
+                        .build();
+
+                    let gestalt_node = GestaltNode {
+                        id: format!("worker_{}", task.id),
+                        engine: engine.clone(),
+                        registry: self.registry.clone(),
+                        repo_url: repo_url.clone(),
+                        question: task.description.clone(),
+                    };
+
+                    let critic = ReflectionNode::new("critic", &format!("worker_{}", task.id), 3);
+                    let mut graph = StateGraph::new();
+                    graph.add_node(Box::new(gestalt_node));
+                    graph.add_node(Box::new(critic));
+                    graph.set_entry_point(&format!("worker_{}", task.id));
+                    graph.set_error_handler("critic");
+
+                    // Sub-task plan (usually just the task itself)
+                    let sub_plan = vec![PlannedTask {
+                        id: "sub-1".to_string(),
+                        description: task.description.clone(),
+                        estimated_tool: task.estimated_tool.clone(),
+                        status: TaskStatus::Pending,
+                    }];
+
+                    let initial_state = ContextState::new(json!({
+                        "plan": sub_plan,
+                        "current_step_index": 0
+                    }));
+
+                    let final_state = graph.execute(initial_state).await?;
+                    let result = final_state
+                        .get_string("final_answer")
+                        .unwrap_or_else(|| "Task completed without detailed report.".to_string());
+
+                    task_results.push(format!("### Task: {}\nResult: {}", task.description, result));
+                }
+
+                let final_report = task_results.join("\n\n---\n\n");
+                let _ = reply.send(final_report);
                 Ok(())
             }
             _ => Ok(()),
@@ -207,32 +247,47 @@ impl ExplicitPlanner for GestaltAgent {
         goal: &str,
         _context: &DecisionContext,
     ) -> anyhow::Result<Vec<PlannedTask>> {
-        // In a real implementation, we would use an LLM to generate the plan.
-        // For now, we simulate the structured planning as per the architectural proposal.
         tracing::info!("Planning for goal: {}", goal);
 
-        // This would call the DecisionEngine with a specific planning prompt
-        // For this task, we provide a mock structured plan that reflects the "Plan-first" approach.
-        let tasks = vec![
-            PlannedTask {
-                id: "1".to_string(),
-                description: format!("Analyze requirements for: {}", goal),
-                estimated_tool: Some("scan_workspace".to_string()),
-                status: TaskStatus::Pending,
-            },
-            PlannedTask {
-                id: "2".to_string(),
-                description: "Execute necessary actions".to_string(),
+        let prompt = format!(
+            "Decompose the following technical goal into a structured plan. \
+             Return ONLY a JSON array of objects with 'id' and 'description' fields. \
+             Goal: {}",
+            goal
+        );
+
+        let response = self.llm_provider.generate(&prompt).await?;
+
+        // Extract JSON
+        let json_str = if let Some(start) = response.find('[') {
+            if let Some(end) = response.rfind(']') {
+                &response[start..=end]
+            } else {
+                &response
+            }
+        } else {
+            &response
+        };
+
+        #[derive(Deserialize)]
+        struct TaskTemplate {
+            id: String,
+            description: String,
+        }
+
+        let templates: Vec<TaskTemplate> = serde_json::from_str(json_str).map_err(|e| {
+            anyhow::anyhow!("Failed to parse plan JSON: {}. Original: {}", e, response)
+        })?;
+
+        let tasks = templates
+            .into_iter()
+            .map(|t| PlannedTask {
+                id: t.id,
+                description: t.description,
                 estimated_tool: None,
                 status: TaskStatus::Pending,
-            },
-            PlannedTask {
-                id: "3".to_string(),
-                description: "Verify results".to_string(),
-                estimated_tool: Some("execute_shell".to_string()),
-                status: TaskStatus::Pending,
-            },
-        ];
+            })
+            .collect();
 
         Ok(tasks)
     }
