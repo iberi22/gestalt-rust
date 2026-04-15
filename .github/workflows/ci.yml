@@ -47,6 +47,9 @@ jobs:
       - name: Cargo Test (CLI)
         run: cargo test -p gestalt_cli --all-targets
 
+      - name: Cargo Test (Swarm)
+        run: cargo test -p gestalt_swarm --all-targets
+
       - name: Cargo Test (Timeline)
         run: cargo test -p gestalt_timeline --lib
 
