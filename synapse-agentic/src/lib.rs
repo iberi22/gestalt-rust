@@ -387,20 +387,11 @@ pub mod prelude {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct EmptyContext;
-    pub trait ToolContext: Send + Sync {}
+    pub trait ToolContext {}
     impl ToolContext for EmptyContext {}
 
-    #[derive(Clone)]
-    pub struct ToolRegistry {
-        tools: Arc<tokio::sync::RwLock<std::collections::HashMap<String, Arc<dyn Tool>>>>,
-    }
-
-    impl std::fmt::Debug for ToolRegistry {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("ToolRegistry").finish()
-        }
-    }
-
+    #[derive(Debug, Clone)]
+    pub struct ToolRegistry;
     impl Default for ToolRegistry {
         fn default() -> Self {
             Self::new()
@@ -408,28 +399,16 @@ pub mod prelude {
     }
     impl ToolRegistry {
         pub fn new() -> Self {
-            Self {
-                tools: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
-            }
+            Self
         }
-        pub async fn register_tool<T: Tool + 'static>(&self, tool: T) {
-            let mut tools = self.tools.write().await;
-            tools.insert(tool.name().to_string(), Arc::new(tool));
-        }
+        pub async fn register_tool<T: Tool + 'static>(&self, _tool: T) {}
         pub async fn call(
             &self,
-            name: &str,
+            _name: &str,
             _ctx: &EmptyContext,
-            args: Value,
+            _args: Value,
         ) -> anyhow::Result<Value> {
-            let tool = {
-                let tools = self.tools.read().await;
-                tools
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| anyhow::anyhow!("Tool '{}' not found", name))?
-            };
-            tool.call(&EmptyContext, args).await
+            Ok(Value::Null)
         }
     }
 
